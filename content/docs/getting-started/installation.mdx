@@ -1,0 +1,65 @@
+---
+title: "Installation"
+description: "Install Starweft on Linux, macOS, or Windows."
+---
+
+## Requirements
+
+- **Rust 1.88** or later (managed via `rust-toolchain.toml`)
+- **OpenClaw** binary (or a compatible script) for worker task execution
+
+SQLite is automatically bundled at build time — no separate installation required.
+
+## Install from crates.io
+
+The simplest way to install Starweft:
+
+```bash
+cargo install starweft
+```
+
+## Build from Source
+
+```bash
+git clone https://github.com/starweft/starweft.git
+cd starweft
+cargo build --release
+```
+
+The binary will be at `target/release/starweft`.
+
+## Platform Notes
+
+<Tabs items="Linux,macOS,Windows">
+
+<div>
+- Default transport: `local_mailbox` (file-based via Unix socket paths)
+- Data directory: `~/.starweft`
+- Secret key files are protected with `0600` permissions
+</div>
+
+<div>
+- Default transport: `local_mailbox` (file-based via Unix socket paths)
+- Data directory: `~/.starweft`
+- Secret key files are protected with `0600` permissions
+- Both Intel and Apple Silicon are supported
+</div>
+
+<div>
+- Default transport: `libp2p` (TCP localhost)
+- Data directory: `%LOCALAPPDATA%\starweft`
+- Secret key files are protected with read-only + hidden attributes
+- Unix socket transport (`local_mailbox`) is **not available** on Windows
+</div>
+
+</Tabs>
+
+## Verify Installation
+
+```bash
+starweft --version
+```
+
+## Next Steps
+
+<LinkCard href="/docs/getting-started/quick-start" title="Quick Start" description="Set up your first multi-node Starweft environment" />

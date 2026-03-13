@@ -1,0 +1,5 @@
+{
+  "title": "Reference",
+  "icon": "code",
+  "pages": ["cli-commands", "config-file", "error-codes", "env-vars"]
+}

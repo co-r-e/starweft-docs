@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://starweft.dev/</loc></url>
+  <url><loc>https://starweft.dev/docs/getting-started/introduction</loc></url>
+  <url><loc>https://starweft.dev/docs/getting-started/installation</loc></url>
+  <url><loc>https://starweft.dev/docs/getting-started/quick-start</loc></url>
+  <url><loc>https://starweft.dev/docs/concepts/architecture</loc></url>
+  <url><loc>https://starweft.dev/docs/concepts/roles</loc></url>
+  <url><loc>https://starweft.dev/docs/concepts/messages</loc></url>
+  <url><loc>https://starweft.dev/docs/concepts/task-lifecycle</loc></url>
+  <url><loc>https://starweft.dev/docs/guides/first-vision</loc></url>
+  <url><loc>https://starweft.dev/docs/guides/multi-machine</loc></url>
+  <url><loc>https://starweft.dev/docs/guides/openclaw</loc></url>
+  <url><loc>https://starweft.dev/docs/guides/config</loc></url>
+  <url><loc>https://starweft.dev/docs/reference/cli-commands</loc></url>
+  <url><loc>https://starweft.dev/docs/reference/config-file</loc></url>
+  <url><loc>https://starweft.dev/docs/reference/error-codes</loc></url>
+  <url><loc>https://starweft.dev/docs/reference/env-vars</loc></url>
+  <url><loc>https://starweft.dev/docs/security/signing</loc></url>
+  <url><loc>https://starweft.dev/docs/security/key-management</loc></url>
+  <url><loc>https://starweft.dev/docs/security/audit</loc></url>
+</urlset>

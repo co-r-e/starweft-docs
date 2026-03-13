@@ -1,0 +1,5 @@
+{
+  "title": "Concepts",
+  "icon": "book",
+  "pages": ["architecture", "roles", "messages", "task-lifecycle"]
+}

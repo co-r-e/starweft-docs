@@ -1,0 +1,135 @@
+---
+title: "Quick Start"
+description: "Set up a local multi-node Starweft environment and submit your first vision."
+---
+
+This guide walks you through setting up a local three-node Starweft environment with a principal, owner, and worker.
+
+## Initialize Nodes
+
+Create separate data directories for each role:
+
+<Steps>
+
+<div>
+
+**Initialize the principal node**
+
+```bash
+starweft init --role principal --data-dir ./demo/principal
+```
+
+</div>
+
+<div>
+
+**Initialize the owner node**
+
+```bash
+starweft init --role owner --data-dir ./demo/owner
+```
+
+</div>
+
+<div>
+
+**Initialize the worker node**
+
+```bash
+starweft init --role worker --data-dir ./demo/worker
+```
+
+</div>
+
+</Steps>
+
+The `init` command sets up the data directory structure and configures the default listen address based on your platform.
+
+## Create Identities
+
+Each node needs an Ed25519 identity for message signing:
+
+```bash
+starweft identity create --data-dir ./demo/principal
+starweft identity create --data-dir ./demo/owner
+starweft identity create --data-dir ./demo/worker
+```
+
+View each node's identity details:
+
+```bash
+starweft identity show --data-dir ./demo/principal
+starweft identity show --data-dir ./demo/owner
+starweft identity show --data-dir ./demo/worker
+```
+
+Note the `actor_id`, `node_id`, and `public_key` values — you'll need them for peer registration.
+
+## Register Peers
+
+Each node needs to know about its peers. Using the local mailbox transport:
+
+```bash
+# Register the owner as a peer of the principal
+starweft peer add /unix/$(pwd)/demo/owner/mailbox.sock \
+  --data-dir ./demo/principal \
+  --actor-id <OWNER_ACTOR_ID> \
+  --node-id <OWNER_NODE_ID> \
+  --public-key <OWNER_PUBLIC_KEY>
+
+# Register the worker as a peer of the owner
+starweft peer add /unix/$(pwd)/demo/worker/mailbox.sock \
+  --data-dir ./demo/owner \
+  --actor-id <WORKER_ACTOR_ID> \
+  --node-id <WORKER_NODE_ID> \
+  --public-key <WORKER_PUBLIC_KEY>
+```
+
+<Callout type="tip">
+  Replace the `<...>` placeholders with the actual values from `identity show`.
+</Callout>
+
+## Start the Nodes
+
+Run each node in a separate terminal:
+
+```bash
+# Terminal 1
+starweft run --data-dir ./demo/principal
+
+# Terminal 2
+starweft run --data-dir ./demo/owner
+
+# Terminal 3
+starweft run --data-dir ./demo/worker
+```
+
+## Submit a Vision
+
+With all nodes running, submit a vision from the principal:
+
+```bash
+starweft vision submit "Build a hello world REST API in Rust" \
+  --data-dir ./demo/principal
+```
+
+The owner will decompose this vision into tasks and distribute them to available workers.
+
+## Monitor Progress
+
+Check the status of your project:
+
+```bash
+starweft status --data-dir ./demo/principal
+```
+
+View the task tree:
+
+```bash
+starweft project task tree --data-dir ./demo/principal
+```
+
+## Next Steps
+
+<LinkCard href="/docs/concepts/architecture" title="Architecture" description="Understand how Starweft's P2P architecture works" />
+<LinkCard href="/docs/concepts/roles" title="Roles" description="Deep dive into the four node roles" />

@@ -1,0 +1,5 @@
+{
+  "title": "Guides",
+  "icon": "map",
+  "pages": ["first-vision", "multi-machine", "openclaw", "config"]
+}

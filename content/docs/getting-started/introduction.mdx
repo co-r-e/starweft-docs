@@ -1,0 +1,51 @@
+---
+title: "Introduction"
+description: "Learn what Starweft is and how it enables distributed multi-agent task coordination."
+---
+
+## What is Starweft?
+
+Starweft is a distributed multi-agent task coordination CLI built in Rust. It enables multiple AI agents to collaborate on complex tasks using a fully peer-to-peer architecture with no central server.
+
+Starweft operates with four distinct roles:
+
+- **Principal** — Submits visions (high-level goals) and issues stop commands
+- **Owner** — Decomposes visions into concrete tasks and distributes them to workers
+- **Worker** — Executes tasks via the OpenClaw bridge and reports progress
+- **Relay** — Forwards messages between nodes that cannot communicate directly
+
+## Key Design Principles
+
+### Zero Infrastructure Cost
+
+Everything runs on your local machine. There are no cloud services to configure, no databases to manage, and no monthly bills. Starweft uses SQLite for persistence and Ed25519 for cryptographic signing — all bundled into a single binary.
+
+### Peer-to-Peer Communication
+
+Nodes communicate directly using either local Unix sockets (for single-machine setups) or libp2p TCP (for multi-machine deployments). There is no central server or coordinator.
+
+### Cryptographic Integrity
+
+Every message in the Starweft network is signed with Ed25519 keys. Canonical JSON serialization ensures deterministic signature verification across all platforms.
+
+### OpenClaw Integration
+
+Workers execute tasks by spawning OpenClaw as a subprocess. OpenClaw is an autonomous AI agent execution framework that handles the actual task execution, while Starweft provides the coordination layer.
+
+## Who is Starweft For?
+
+Starweft is designed for **OpenClaw users** who need to distribute and coordinate AI agent tasks across multiple processes or machines. If you're already using OpenClaw for autonomous AI agent execution, Starweft adds a distributed coordination layer on top.
+
+## What Can You Do With Starweft?
+
+- Submit high-level visions and have them automatically decomposed into tasks
+- Distribute tasks across multiple worker nodes
+- Track task progress, results, and artifacts
+- Evaluate task outcomes with configurable scoring
+- Export publish contexts for documentation or reporting
+- Run backup, restore, and audit operations on the event store
+
+## Next Steps
+
+<LinkCard href="/docs/getting-started/installation" title="Installation" description="Install Starweft on your machine" />
+<LinkCard href="/docs/getting-started/quick-start" title="Quick Start" description="Get up and running with a basic multi-node setup" />
