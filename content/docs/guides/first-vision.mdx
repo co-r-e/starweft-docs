@@ -3,4 +3,318 @@ title: "Your First Vision"
 description: "A step-by-step guide to submitting and tracking your first vision."
 ---
 
-Content coming soon. This section will cover a step-by-step walkthrough of submitting your first vision, tracking its progress as it is decomposed into tasks, and monitoring the results.
+このガイドでは、Starweft で最初のビジョンを投入し、タスクの分解・実行・評価までの一連の流れを体験します。
+
+## 前提条件
+
+以下の準備が完了していることを確認してください。
+
+- principal、owner、worker の各ノードが `starweft init` で初期化済み
+- 各ノードで `starweft identity create` による Ed25519 ID が作成済み
+- `starweft peer add` で相互にピア登録済み
+
+<Callout type="tip">
+  まだセットアップが済んでいない場合は、先に [Quick Start](/docs/getting-started/quick-start) を完了してください。
+</Callout>
+
+## Vision の投入
+
+<Steps>
+
+<div>
+
+**ビジョンテキストを準備する**
+
+ビジョンは、達成したい目標を自然言語で記述したものです。タスク分解の精度を上げるために、以下を含めることを推奨します。
+
+- 具体的な成果物
+- 受け入れ基準（acceptance criteria）
+- リスクや制約条件
+
+</div>
+
+<div>
+
+**`vision plan` でプレビューする**
+
+実際に投入する前に、プラン（タスク分解計画）をプレビューできます。
+
+```bash
+starweft vision plan \
+  --data-dir ./demo/principal \
+  --title "REST API の構築" \
+  --text "Rust で Hello World REST API を構築する。GET /health エンドポイントを含め、テストで動作を検証すること。"
+```
+
+プレビューには以下の情報が含まれます。
+
+- **task_count** — 分解されるタスク数
+- **confidence** — プラン品質の信頼度スコア（0.0〜1.0）
+- **planning_risk** — リスク評価（low / medium / high）
+- **missing_information** — 不足している情報の一覧
+- **approval_token** — 承認用トークン
+
+</div>
+
+<div>
+
+**制約条件を追加する（推奨）**
+
+`--constraint` フラグで制約条件を指定すると、信頼度スコアが向上します。
+
+```bash
+starweft vision plan \
+  --data-dir ./demo/principal \
+  --title "REST API の構築" \
+  --text "Rust で Hello World REST API を構築する。GET /health エンドポイントを含め、テストで動作を検証すること。" \
+  --constraint budget_mode=balanced \
+  --constraint allow_external_agents=true \
+  --constraint human_intervention=required
+```
+
+主要な制約条件:
+
+| 制約 | 説明 | 推奨値 |
+|------|------|--------|
+| `budget_mode` | 実行コストの方針 | `balanced` |
+| `allow_external_agents` | 外部エージェントの利用可否 | `true` |
+| `human_intervention` | 人間の承認要否 | `required` |
+
+</div>
+
+<div>
+
+**`vision submit` で投入する**
+
+プレビューの内容に問題がなければ、ビジョンを投入します。
+
+```bash
+starweft vision submit \
+  --data-dir ./demo/principal \
+  --title "REST API の構築" \
+  --text "Rust で Hello World REST API を構築する。GET /health エンドポイントを含め、テストで動作を検証すること。" \
+  --constraint budget_mode=balanced \
+  --constraint allow_external_agents=true \
+  --constraint human_intervention=required
+```
+
+成功すると `vision_id` と `msg_id` が出力されます。
+
+```
+vision_id: 01J...
+msg_id: 01J...
+owner_actor_id: actor_...
+```
+
+</div>
+
+</Steps>
+
+## 承認付き投入
+
+`human_intervention=required` を指定した場合、投入前に承認トークンが必要です。
+
+<Steps>
+
+<div>
+
+**プレビューで承認トークンを取得する**
+
+```bash
+starweft vision submit \
+  --data-dir ./demo/principal \
+  --title "REST API の構築" \
+  --text "..." \
+  --constraint human_intervention=required \
+  --dry-run
+```
+
+出力に含まれる `approval_token` と `approval_command` を確認します。
+
+</div>
+
+<div>
+
+**承認トークン付きで投入する**
+
+```bash
+starweft vision submit \
+  --data-dir ./demo/principal \
+  --title "REST API の構築" \
+  --text "..." \
+  --constraint human_intervention=required \
+  --approve <APPROVAL_TOKEN>
+```
+
+</div>
+
+</Steps>
+
+<Callout type="warning">
+  承認トークンはプレビュー内容のハッシュ値です。ビジョンテキストや制約を変更すると無効になるため、再度 `--dry-run` で取得し直してください。
+</Callout>
+
+## 進捗のモニタリング
+
+ビジョンが投入され、ノードが稼働すると、owner がタスク分解を行い worker に配布します。
+
+### ノードの稼働状態を確認する
+
+```bash
+starweft status --data-dir ./demo/principal
+```
+
+`--watch` フラグでリアルタイム監視が可能です。
+
+```bash
+starweft status --data-dir ./demo/owner --watch --interval-sec 3
+```
+
+### プロジェクト一覧を確認する
+
+ビジョンは owner ノード上で「プロジェクト」として管理されます。
+
+```bash
+starweft project list --data-dir ./demo/owner
+```
+
+ステータスでフィルタリングもできます。
+
+```bash
+starweft project list --data-dir ./demo/owner --status active
+```
+
+### タスクツリーを確認する
+
+プロジェクト配下のタスク構造をツリー形式で表示します。
+
+```bash
+starweft task tree --data-dir ./demo/owner --project <PROJECT_ID>
+```
+
+### タスク一覧を確認する
+
+フラットなタスク一覧を表示します。フィルタ条件も指定できます。
+
+```bash
+starweft task list --data-dir ./demo/owner --project <PROJECT_ID>
+starweft task list --data-dir ./demo/owner --status running
+```
+
+### スナップショットを取得する
+
+特定のプロジェクトやタスクの詳細スナップショットを取得します。
+
+```bash
+starweft snapshot --data-dir ./demo/owner --project <PROJECT_ID>
+```
+
+`--watch` で定期的に更新を確認できます。
+
+```bash
+starweft snapshot --data-dir ./demo/owner --project <PROJECT_ID> --watch
+```
+
+### イベントログを確認する
+
+メッセージ交換の履歴を時系列で確認できます。
+
+```bash
+starweft events --data-dir ./demo/owner --project <PROJECT_ID> --tail 30
+```
+
+`--follow` フラグでリアルタイムにイベントを追跡できます。
+
+```bash
+starweft events --data-dir ./demo/owner --follow
+```
+
+### TUI ダッシュボード
+
+リアルタイムのステータスを TUI で確認できます。
+
+```bash
+starweft dashboard --data-dir ./demo/owner
+```
+
+## 結果の確認と評価
+
+### 評価結果の確認
+
+タスクが完了すると、owner ノードがヒューリスティック評価を実施します。評価結果はイベントログに記録されます。
+
+```bash
+starweft events --data-dir ./demo/owner --msg-type evaluation_issued
+```
+
+### 成果物のエクスポート
+
+プロジェクトやタスクの結果を JSON で書き出せます。
+
+```bash
+# プロジェクト全体
+starweft export project --data-dir ./demo/owner --project <PROJECT_ID>
+
+# 特定タスク
+starweft export task --data-dir ./demo/owner --task <TASK_ID>
+
+# 評価結果
+starweft export evaluation --data-dir ./demo/owner --project <PROJECT_ID>
+```
+
+`--output` でファイルに保存できます。
+
+```bash
+starweft export project --data-dir ./demo/owner --project <PROJECT_ID> --output result.json
+```
+
+## 停止制御
+
+プロジェクトやタスクツリーの実行を停止するには、principal ノードから `stop` コマンドを使用します。
+
+```bash
+starweft stop \
+  --data-dir ./demo/principal \
+  --project <PROJECT_ID> \
+  --reason-code user_request \
+  --reason "目標達成のため停止" \
+  --yes
+```
+
+特定のタスクツリーのみ停止する場合:
+
+```bash
+starweft stop \
+  --data-dir ./demo/principal \
+  --task-tree <TASK_ID> \
+  --reason-code user_request \
+  --reason "このタスクは不要" \
+  --yes
+```
+
+## ファイルからビジョンを読み込む
+
+長いビジョンテキストはファイルから読み込めます。
+
+```bash
+starweft vision submit \
+  --data-dir ./demo/principal \
+  --title "大規模リファクタリング" \
+  --file ./vision.txt \
+  --constraint human_intervention=required
+```
+
+## JSON 出力
+
+すべてのコマンドは `--json` フラグで機械可読な JSON を出力します。スクリプトからの利用に便利です。
+
+```bash
+starweft vision plan --data-dir ./demo/principal \
+  --title "テスト" --text "テスト用ビジョン" --json
+```
+
+## 次のステップ
+
+<LinkCard href="/docs/guides/openclaw" title="OpenClaw 統合" description="Worker ノードに OpenClaw を接続してタスクを自動実行する" />
+<LinkCard href="/docs/guides/config" title="設定ガイド" description="TOML 設定ファイルで動作をカスタマイズする" />
+<LinkCard href="/docs/guides/multi-machine" title="マルチマシン構成" description="複数マシンにまたがるノード構成を構築する" />

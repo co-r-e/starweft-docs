@@ -3,4 +3,446 @@ title: "Configuration"
 description: "Customize Starweft behavior with TOML configuration files."
 ---
 
-Content coming soon. This section will cover how to customize Starweft behavior using TOML configuration files, including common settings, per-role configuration, and best practices.
+このガイドでは、Starweft の TOML 設定ファイルの構造と主要な設定項目を説明します。
+
+## 設定ファイルの場所
+
+設定ファイルはデータディレクトリ内の `config.toml` です。
+
+| プラットフォーム | デフォルトパス |
+|----------------|---------------|
+| macOS / Linux | `~/.starweft/config.toml` |
+| Windows | `%LOCALAPPDATA%\starweft\config.toml` |
+
+`--data-dir` オプションでデータディレクトリを指定した場合は、そのディレクトリ内の `config.toml` が使用されます。
+
+## 設定の確認と検証
+
+### `config show`
+
+現在の設定を表示します。シークレット値は自動的にマスクされます。
+
+```bash
+starweft config show --data-dir ~/.starweft
+```
+
+JSON 形式で出力:
+
+```bash
+starweft config show --data-dir ~/.starweft --json
+```
+
+### `config validate`
+
+設定ファイルの妥当性を検証し、エラーと警告を報告します。
+
+```bash
+starweft config validate --data-dir ~/.starweft
+```
+
+検証される項目:
+- リッスンアドレスの形式
+- データディレクトリの存在
+- Identity 鍵ファイルの存在とパーミッション
+- プロトコルバージョンとスキーマバージョンの互換性
+- OpenClaw バイナリの存在
+- `capability_version` と `bridge_capability_version` の一致
+
+## 設定セクション一覧
+
+<FileTree data={[
+  { name: "config.toml", type: "file", children: [
+    { name: "[node] — ノードの基本設定", type: "file" },
+    { name: "[identity] — 鍵ファイルのパス", type: "file" },
+    { name: "[discovery] — ピア検出・mDNS・レジストリ", type: "file" },
+    { name: "[p2p] — トランスポート設定", type: "file" },
+    { name: "[ledger] — SQLite データベースのパス", type: "file" },
+    { name: "[openclaw] — OpenClaw ブリッジ設定", type: "file" },
+    { name: "[compatibility] — プロトコルバージョン", type: "file" },
+    { name: "[owner] — Owner ロール固有の設定", type: "file" },
+    { name: "[worker] — Worker ロール固有の設定", type: "file" },
+    { name: "[observation] — プランニング・評価エンジン", type: "file" },
+    { name: "[logs] — ログローテーション", type: "file" },
+    { name: "[artifacts] — 成果物の保存設定", type: "file" }
+  ]}
+]} />
+
+## `[node]` セクション
+
+ノードの基本設定です。
+
+```toml
+[node]
+role = "owner"
+display_name = "owner-node"
+data_dir = "~/.starweft"
+listen = ["/unix//home/user/.starweft/mailbox.sock"]
+log_level = "info"
+```
+
+<ApiTable data={[
+  { field: "role", type: "string", description: "ノードの役割: principal / owner / worker / relay" },
+  { field: "display_name", type: "string", description: "ノードの表示名" },
+  { field: "data_dir", type: "string", description: "データディレクトリのパス" },
+  { field: "listen", type: "string[]", description: "リッスンアドレスのリスト" },
+  { field: "log_level", type: "string", description: "ログレベル: trace / debug / info / warn / error" }
+]} />
+
+### リッスンアドレスの形式
+
+| トランスポート | 形式 | 例 |
+|---------------|------|-----|
+| Unix ソケット | `/unix/<path>` | `/unix//home/user/.starweft/mailbox.sock` |
+| TCP | `/ip4/<addr>/tcp/<port>` | `/ip4/0.0.0.0/tcp/9100` |
+| IPv6 TCP | `/ip6/<addr>/tcp/<port>` | `/ip6/::1/tcp/9100` |
+
+## `[identity]` セクション
+
+Ed25519 鍵ファイルのパスを指定します。
+
+```toml
+[identity]
+actor_key_path = "~/.starweft/identity/actor_key"
+stop_authority_key_path = "~/.starweft/identity/stop_authority_key"
+```
+
+<ApiTable data={[
+  { field: "actor_key_path", type: "string?", description: "メッセージ署名に使用する Ed25519 秘密鍵のパス" },
+  { field: "stop_authority_key_path", type: "string?", description: "停止命令の署名に使用する鍵のパス（principal のみ）" }
+]} />
+
+<Callout type="info">
+  `stop_authority_key_path` は principal ロールでのみ自動生成されます。他のロールでは `null` です。
+</Callout>
+
+## `[discovery]` セクション
+
+ピア検出とレジストリの設定です。
+
+```toml
+[discovery]
+seeds = ["/ip4/192.168.1.20/tcp/9100/p2p/12D3Koo..."]
+auto_discovery = true
+mdns = false
+registry_url = ""
+registry_ttl_sec = 300
+registry_heartbeat_sec = 60
+```
+
+<ApiTable data={[
+  { field: "seeds", type: "string[]", description: "起動時に接続するシードピアのマルチアドレス" },
+  { field: "auto_discovery", type: "bool", description: "CapabilityQuery/Advertisement の自動交換 (default: true)" },
+  { field: "mdns", type: "bool", description: "mDNS によるローカルネットワーク自動検出 (default: false)" },
+  { field: "registry_url", type: "string?", description: "ピアレジストリサーバーの URL" },
+  { field: "registry_ttl_sec", type: "u64", description: "レジストリ登録の TTL（秒） (default: 300)" },
+  { field: "registry_heartbeat_sec", type: "u64", description: "レジストリへのハートビート間隔（秒） (default: 60)" },
+  { field: "registry_shared_secret", type: "string?", description: "レジストリ認証用の共有シークレット" },
+  { field: "registry_shared_secret_env", type: "string?", description: "共有シークレットを読み取る環境変数名" }
+]} />
+
+<Callout type="warning">
+  `registry_shared_secret` を設定ファイルに直接記載する場合、ファイルのパーミッションが 0600（所有者のみ読み書き）であることを確認してください。`config show` で表示する際は自動的にマスクされます。
+</Callout>
+
+## `[p2p]` セクション
+
+トランスポートの種類と接続設定です。
+
+```toml
+[p2p]
+transport = "local_mailbox"
+relay_enabled = true
+direct_preferred = true
+max_peers = 128
+```
+
+<ApiTable data={[
+  { field: "transport", type: "string", description: "local_mailbox（Unix デフォルト）または libp2p（Windows デフォルト）" },
+  { field: "relay_enabled", type: "bool", description: "relay ノード経由の通信を許可 (default: true)" },
+  { field: "direct_preferred", type: "bool", description: "直接接続を優先 (default: true)" },
+  { field: "max_peers", type: "u16", description: "最大ピア数 (default: 128)" }
+]} />
+
+## `[openclaw]` セクション
+
+OpenClaw ブリッジの設定です。Worker ノードで使用します。
+
+```toml
+[openclaw]
+enabled = false
+bin = "openclaw"
+working_dir = "/home/user/workspace"
+timeout_sec = 3600
+capability_version = "openclaw.execution.v1"
+```
+
+<ApiTable data={[
+  { field: "enabled", type: "bool", description: "OpenClaw ブリッジを有効にする (default: false)" },
+  { field: "bin", type: "string", description: "OpenClaw バイナリのパス (default: openclaw)" },
+  { field: "working_dir", type: "string?", description: "サブプロセスの作業ディレクトリ" },
+  { field: "timeout_sec", type: "u64", description: "実行タイムアウト（秒） (default: 3600)" },
+  { field: "capability_version", type: "string", description: "capability 識別子 (default: openclaw.execution.v1)" }
+]} />
+
+## `[compatibility]` セクション
+
+プロトコルバージョンとスキーマバージョンの設定です。
+
+```toml
+[compatibility]
+protocol_version = "starweft/0.1"
+schema_version = "starweft-store/2"
+bridge_capability_version = "openclaw.execution.v1"
+allow_legacy_protocols = false
+```
+
+<ApiTable data={[
+  { field: "protocol_version", type: "string", description: "メッセージプロトコルバージョン" },
+  { field: "schema_version", type: "string", description: "SQLite スキーマバージョン" },
+  { field: "bridge_capability_version", type: "string", description: "OpenClaw ブリッジの capability バージョン" },
+  { field: "allow_legacy_protocols", type: "bool", description: "古いプロトコルバージョンを許可 (default: false)" }
+]} />
+
+<Callout type="warning">
+  `openclaw.capability_version` と `bridge_capability_version` が一致しない場合、ノード起動時にエラーが発生します。
+</Callout>
+
+## `[owner]` セクション
+
+Owner ロール固有の設定です。タスク失敗時のリトライ動作を制御します。
+
+```toml
+[owner]
+max_retry_attempts = 8
+retry_cooldown_ms = 250
+retry_strategy = "rule_based"
+
+[[owner.retry_rules]]
+pattern = "timeout"
+action = "retry_same_worker"
+reason = "transient timeout"
+
+[[owner.retry_rules]]
+pattern = "process failed"
+action = "retry_different_worker"
+reason = "transient execution failure"
+
+[[owner.retry_rules]]
+pattern = "capability mismatch"
+action = "no_retry"
+reason = "permanent task/input failure"
+```
+
+<ApiTable data={[
+  { field: "max_retry_attempts", type: "u64", description: "最大リトライ回数 (default: 8)" },
+  { field: "retry_cooldown_ms", type: "u64", description: "リトライ間隔（ミリ秒） (default: 250)" },
+  { field: "retry_strategy", type: "string", description: "リトライ戦略: rule_based (default: rule_based)" },
+  { field: "retry_rules", type: "array", description: "エラーパターンとリトライアクションのルール配列" }
+]} />
+
+### リトライアクション
+
+| アクション | 説明 |
+|-----------|------|
+| `retry_same_worker` | 同じ Worker で再試行 |
+| `retry_different_worker` | 別の Worker で再試行 |
+| `no_retry` | リトライしない |
+
+## `[worker]` セクション
+
+Worker ロール固有の設定です。
+
+```toml
+[worker]
+accept_join_offers = true
+max_active_tasks = 1
+```
+
+<ApiTable data={[
+  { field: "accept_join_offers", type: "bool", description: "JoinOffer を自動で受け入れる (default: true)" },
+  { field: "max_active_tasks", type: "u64", description: "同時実行可能なタスク数 (default: 1)" }
+]} />
+
+## `[observation]` セクション
+
+タスクプランニングと評価エンジンの設定です。
+
+```toml
+[observation]
+cache_snapshots = true
+cache_ttl_sec = 30
+max_planned_tasks = 6
+min_task_objective_chars = 48
+planner = "heuristic"
+evaluator = "heuristic"
+planner_bin = ""
+planner_working_dir = ""
+planner_timeout_sec = 120
+planner_capability_version = "openclaw.plan.v1"
+planner_fallback_to_heuristic = true
+```
+
+<ApiTable data={[
+  { field: "cache_snapshots", type: "bool", description: "スナップショットのキャッシュ (default: true)" },
+  { field: "cache_ttl_sec", type: "u64", description: "キャッシュの有効期間（秒） (default: 30)" },
+  { field: "max_planned_tasks", type: "usize", description: "1 ビジョンから生成する最大タスク数 (default: 6)" },
+  { field: "min_task_objective_chars", type: "usize", description: "タスク目的の最小文字数 (default: 48)" },
+  { field: "planner", type: "string", description: "heuristic / openclaw / openclaw_worker (default: heuristic)" },
+  { field: "evaluator", type: "string", description: "heuristic (default: heuristic)" },
+  { field: "planner_bin", type: "string?", description: "openclaw プランナーのバイナリパス" },
+  { field: "planner_working_dir", type: "string?", description: "プランナーの作業ディレクトリ" },
+  { field: "planner_timeout_sec", type: "u64", description: "プランナーのタイムアウト（秒） (default: 120)" },
+  { field: "planner_capability_version", type: "string", description: "プランナーの capability バージョン (default: openclaw.plan.v1)" },
+  { field: "planner_fallback_to_heuristic", type: "bool", description: "OpenClaw プランナー失敗時にヒューリスティックへフォールバック (default: true)" }
+]} />
+
+## `[logs]` セクション
+
+ログローテーションの設定です。
+
+```toml
+[logs]
+rotate_max_bytes = 1048576
+max_archives = 5
+```
+
+<ApiTable data={[
+  { field: "rotate_max_bytes", type: "u64", description: "ログファイルの最大サイズ（バイト） (default: 1048576 = 1MB)" },
+  { field: "max_archives", type: "usize", description: "保持するアーカイブファイル数 (default: 5)" }
+]} />
+
+## `[artifacts]` セクション
+
+タスク成果物の保存設定です。
+
+```toml
+[artifacts]
+dir = "~/.starweft/artifacts"
+max_files = 256
+max_age_sec = 604800
+```
+
+<ApiTable data={[
+  { field: "dir", type: "string", description: "成果物の保存ディレクトリ" },
+  { field: "max_files", type: "usize", description: "最大保存ファイル数 (default: 256)" },
+  { field: "max_age_sec", type: "u64", description: "成果物の最大保持期間（秒） (default: 604800 = 7日)" }
+]} />
+
+## ロール別の推奨設定
+
+### Principal
+
+```toml
+[node]
+role = "principal"
+log_level = "info"
+
+[identity]
+actor_key_path = "~/.starweft/identity/actor_key"
+stop_authority_key_path = "~/.starweft/identity/stop_authority_key"
+```
+
+Principal はビジョンの投入と停止命令の発行のみを行います。`stop_authority_key_path` は principal ロールでのみ必要です。
+
+### Owner
+
+```toml
+[node]
+role = "owner"
+
+[owner]
+max_retry_attempts = 8
+retry_cooldown_ms = 250
+
+[observation]
+planner = "heuristic"
+max_planned_tasks = 6
+cache_snapshots = true
+```
+
+Owner はタスクの分解・配布・評価を担当します。`max_planned_tasks` はビジョンの複雑さに応じて調整してください。
+
+### Worker
+
+```toml
+[node]
+role = "worker"
+
+[openclaw]
+enabled = true
+bin = "/usr/local/bin/openclaw"
+timeout_sec = 3600
+
+[worker]
+accept_join_offers = true
+max_active_tasks = 1
+```
+
+Worker はタスクの実行を担当します。`max_active_tasks` はマシンリソースに応じて調整してください。
+
+### Relay
+
+```toml
+[node]
+role = "relay"
+listen = ["/ip4/0.0.0.0/tcp/9300"]
+
+[p2p]
+transport = "libp2p"
+```
+
+Relay はメッセージ転送のみを行います。identity や OpenClaw の設定は不要です。
+
+## よくある設定シナリオ
+
+### シングルマシンの開発環境
+
+```toml
+[p2p]
+transport = "local_mailbox"
+
+[discovery]
+mdns = false
+```
+
+同一マシン上で複数ノードを起動する場合は、各ノードに異なる `--data-dir` を指定し、Unix ソケットで通信します。
+
+### LAN 内のマルチマシン環境
+
+```toml
+[p2p]
+transport = "libp2p"
+
+[discovery]
+mdns = true
+auto_discovery = true
+```
+
+同一 LAN 内のノードは mDNS で自動検出されます。
+
+### インターネット越しの分散環境
+
+```toml
+[p2p]
+transport = "libp2p"
+relay_enabled = true
+
+[discovery]
+mdns = false
+seeds = ["/ip4/203.0.113.10/tcp/9300/p2p/12D3Koo..."]
+```
+
+NAT の背後にあるノードは relay を経由して通信します。mDNS は無効にしてください。
+
+## セキュリティに関する注意
+
+- 設定ファイルは **0600 パーミッション**（所有者のみ読み書き）で保存されます
+- `registry_shared_secret` は環境変数経由（`registry_shared_secret_env`）での指定を推奨します
+- `config show` はシークレット値を自動的に `<redacted>` にマスクして表示します
+- Windows 環境では、ファイルに隠し属性が設定され、ACL で現在のユーザーのみにアクセスが制限されます
+
+## 次のステップ
+
+<LinkCard href="/docs/guides/multi-machine" title="マルチマシン構成" description="libp2p トランスポートとmDNS による分散ノード構成" />
+<LinkCard href="/docs/guides/openclaw" title="OpenClaw 統合" description="OpenClaw ブリッジの詳細設定" />
+<LinkCard href="/docs/reference/config-file" title="設定リファレンス" description="全設定項目の一覧" />

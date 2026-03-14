@@ -3,4 +3,139 @@ title: "Message Signing"
 description: "How Ed25519 signing and canonical JSON ensure message integrity."
 ---
 
-Content coming soon. This section will cover how Ed25519 signing and canonical JSON serialization work together to ensure message integrity and authenticity across the peer-to-peer network.
+## 概要
+
+Starweft は P2P ネットワーク上のすべてのメッセージに **Ed25519 デジタル署名**を付与します。中央サーバーが存在しないため、メッセージの真正性と完全性は暗号署名のみで保証されます。
+
+署名に使用されるライブラリは [`ed25519-dalek`](https://docs.rs/ed25519-dalek) です。鍵長は秘密鍵・公開鍵ともに 32 バイトで、署名は 64 バイトです。
+
+## 署名フロー
+
+メッセージの署名は以下の手順で行われます。
+
+<Steps>
+
+### UnsignedEnvelope の構築
+
+送信側ノードは `UnsignedEnvelope<T>` を作成します。Envelope にはプロトコルバージョン、メッセージ ID、送信元/宛先アクター ID、Lamport タイムスタンプなどのメタデータと、型付きメッセージ本文 (`body`) が含まれます。
+
+```rust
+let envelope = UnsignedEnvelope::new(actor_id, Some(to_actor_id), body)
+    .with_vision_id(vision_id)
+    .with_project_id(project_id)
+    .with_lamport_ts(lamport_ts);
+```
+
+### Canonical JSON へのシリアライズ
+
+署名対象のフィールド (`SignableEnvelope`) を **Canonical JSON** にシリアライズします。`signature` フィールドは署名対象に含まれません。
+
+```rust
+let signable_bytes = canonical_json(&SignableEnvelope {
+    protocol, msg_id, msg_type, from_actor_id, to_actor_id,
+    vision_id, project_id, task_id, lamport_ts, created_at,
+    expires_at, body,
+})?;
+```
+
+### Ed25519 署名
+
+Canonical JSON バイト列に対して Ed25519 秘密鍵で署名を生成します。署名結果は Base64 エンコードされ、`MessageSignature` 構造体に格納されます。
+
+```rust
+let signature = keypair.sign_bytes(&signable_bytes)?;
+// MessageSignature { alg: "ed25519", key_id: "...", sig: "<base64>" }
+```
+
+### Signed Envelope の完成
+
+署名付きの `Envelope<T>` が完成し、ネットワーク上に送信されます。
+
+```rust
+let signed_envelope = unsigned_envelope.sign(&keypair)?;
+```
+
+</Steps>
+
+## 署名検証
+
+受信側は `Envelope::verify_with_key()` で署名を検証します。
+
+```rust
+envelope.verify_with_key(&verifying_key)?;
+```
+
+検証の手順は以下の通りです。
+
+1. `signature.alg` が `"ed25519"` であることを確認
+2. `msg_type` と `body.msg_type()` が一致することを確認
+3. 署名対象フィールドから `SignableEnvelope` を再構築し、Canonical JSON にシリアライズ
+4. 送信者の公開鍵で Ed25519 署名を検証
+
+<Callout type="warning">
+署名検証に失敗したメッセージは破棄されます。`signature_failures` として監査ログに記録されるため、`audit verify-log` で後から検出できます。
+</Callout>
+
+## Wire Envelope
+
+ネットワーク転送時には `WireEnvelope` 形式が使用されます。`body` フィールドが型付き構造体ではなく `serde_json::Value`（非型付き JSON）として保持される点が `Envelope<T>` と異なります。
+
+`WireEnvelope` にも `verify_with_key()` が実装されており、`body` が `Value` 型のままでも署名検証が可能です。これは relay ノードがメッセージ本文をデシリアライズせずに署名を検証できることを意味します。
+
+## Canonical JSON
+
+### シリアライズルール
+
+Canonical JSON は以下のルールでバイト列を決定論的に生成します。
+
+- **オブジェクトキーはアルファベット順にソート**（再帰的に全ネスト階層で適用）
+- 配列の要素順序は維持
+- スカラー値（数値、文字列、真偽値、null）は標準 JSON 表現
+- 余分な空白は含まない
+
+```json
+// 入力（キー順序不定）
+{"z": 1, "a": {"c": 3, "b": 2}, "m": [{"y": 4, "x": 5}]}
+
+// Canonical JSON 出力（キーがソート済み）
+{"a":{"b":2,"c":3},"m":[{"x":5,"y":4}],"z":1}
+```
+
+### なぜ Canonical JSON が必要か
+
+Ed25519 はバイト列に対して署名を行います。同じ論理的 JSON であっても、キーの並び順やフォーマットが異なればバイト列が変わり、署名検証は失敗します。
+
+Canonical JSON は以下の問題を解決します。
+
+- **フィールド挿入順序の違い** -- `serde_json` の `preserve_order` 機能やプラットフォームの差異でキー順序が変わりうる
+- **クロスプラットフォーム決定性** -- 異なる OS・アーキテクチャのノード間でも同一のバイト列を生成
+- **言語間互換性** -- 将来的に Rust 以外のクライアントが参加しても、同一の Canonical JSON ルールに従えば署名検証が可能
+
+<Callout type="info">
+実装は `starweft-crypto` クレートの `canonical_json()` 関数です。内部では `serde_json::to_value()` で中間値を生成し、`sort_json_keys_recursive()` で全階層のオブジェクトキーをソートした後、`serde_json::to_vec()` で空白なしの JSON バイト列に変換します。
+</Callout>
+
+## mDNS とセキュリティモデル
+
+Starweft v0.3.0 では、libp2p トランスポート使用時に **mDNS** によるローカルネットワーク上のピア自動発見をサポートしています。設定ファイルの `discovery.mdns = true` で有効化できます。
+
+### mDNS は認証されない
+
+mDNS プロトコル自体には認証メカニズムがありません。同一 LAN 上の任意のノードがピアとして発見される可能性があります。
+
+### Ed25519 署名がメッセージ層を保護
+
+mDNS が認証されていなくても、Starweft のセキュリティは損なわれません。すべてのプロトコルメッセージは Ed25519 で署名されており、以下の保証が維持されます。
+
+- **改ざん検知** -- メッセージ内容が改変されると署名検証が失敗する
+- **なりすまし防止** -- 秘密鍵を持たないノードは有効な署名を生成できない
+- **公開鍵によるピア識別** -- `peer add` で登録された公開鍵、または `CapabilityQuery` / `CapabilityAdvertisement` で交換された公開鍵により、ピアの identity を検証できる
+
+<Callout type="tip">
+mDNS はあくまでピア発見の利便性のための仕組みです。信頼の根拠はすべて Ed25519 鍵ペアに基づいています。信頼できないネットワークでは `discovery.mdns = false` に設定し、`peer add` による手動ピア登録を使用してください。
+</Callout>
+
+## 関連ページ
+
+<LinkCard href="/docs/security/key-management" title="鍵管理" description="Ed25519 鍵の生成、保管、交換方法" />
+<LinkCard href="/docs/security/audit" title="監査" description="イベントログの署名検証と整合性チェック" />

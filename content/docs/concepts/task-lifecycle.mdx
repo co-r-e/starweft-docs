@@ -3,4 +3,367 @@ title: "Task Lifecycle"
 description: "From vision submission to task completion — the full lifecycle of work in Starweft."
 ---
 
-Content coming soon. This section will cover the full lifecycle of work in Starweft, from vision submission by a principal, through task decomposition by an owner, execution by workers via the OpenClaw bridge, and evaluation of results.
+## ライフサイクル全体像
+
+Starweft におけるタスクのライフサイクルは、Principal のビジョン投入から始まり、Owner によるタスク分解、Worker による実行、評価を経て完了します。
+
+```
+Principal           Owner                Worker
+   │                  │                    │
+   │ vision submit    │                    │
+   ├─────────────────▶│                    │
+   │                  │ plan & charter     │
+   │◀─────────────────┤                    │
+   │                  │ discover peers     │
+   │                  ├───────────────────▶│
+   │                  │◀───────────────────┤
+   │                  │ join offer/accept  │
+   │                  ├───────────────────▶│
+   │                  │◀───────────────────┤
+   │                  │ delegate task      │
+   │                  ├───────────────────▶│
+   │                  │     progress       │
+   │                  │◀───────────────────┤
+   │                  │   result submit    │
+   │                  │◀───────────────────┤
+   │                  │ evaluation issued  │
+   │                  ├───────────────────▶│
+   │                  │                    │
+```
+
+## Vision から Charter へ
+
+<Steps>
+### ビジョンの投入
+
+Principal が `starweft vision submit` を実行し、**VisionIntent** メッセージを Owner に送信します。
+
+```bash
+starweft vision submit --title "検索機能の実装" \
+  --text "Elasticsearch を使った全文検索を実装する" \
+  --owner <owner-actor-id>
+```
+
+VisionIntent には以下が含まれます:
+- **title**: 短いタイトル
+- **raw_vision_text**: 自由記述の目標テキスト
+- **constraints**: 実行制約 (budget_mode, allow_external_agents, human_intervention)
+
+### ProjectCharter の生成
+
+Owner が VisionIntent を受信すると、自動的に **ProjectCharter** を生成します。
+
+- `project_id` を ULID で発行
+- `evaluation_policy` に 4 次元の重み (quality, speed, reliability, alignment) を設定
+- `participant_policy` で外部エージェントの参加可否を決定
+- `stop_authority_actor_id` に停止権限者 (通常は Principal) を設定
+
+### タスク分解 (Planning)
+
+Owner がビジョンをタスクに分解します。プランニング戦略に応じた方法で `PlannedTaskSpec` のリストを生成します。
+
+各タスクには以下が設定されます:
+- **title / description / objective**: タスクの定義
+- **required_capability**: 実行に必要なケイパビリティ (例: `"openclaw.execution.v1"`)
+- **input_payload**: Worker への入力データ (JSON)
+- **expected_output_schema**: 期待する出力の JSON Schema
+</Steps>
+
+## JoinOffer / Accept フロー
+
+Owner が Worker にタスクを委任する前に、ケイパビリティの確認と参加合意を行います。
+
+```
+Owner                              Worker
+  │                                  │
+  │──CapabilityQuery────────────────▶│
+  │◀─CapabilityAdvertisement────────│
+  │                                  │
+  │  (ケイパビリティを確認)            │
+  │                                  │
+  │──JoinOffer──────────────────────▶│
+  │  required_capabilities           │
+  │  task_outline                    │
+  │  expected_duration_sec           │
+  │                                  │
+  │◀─JoinAccept─────────────────────│
+  │  capabilities_confirmed          │
+  │                                  │
+```
+
+Worker が JoinOffer を受諾するための条件:
+
+1. `accept_join_offers = true` であること
+2. 現在の実行中タスク数が `max_active_tasks` 未満であること
+3. 要求されたケイパビリティを保有していること
+
+<Callout type="info">
+Worker が条件を満たさない場合は **JoinReject** を返します。Owner は別の Worker を探すか、タスクをキューに戻します。
+</Callout>
+
+## タスク実行
+
+### TaskDelegated の送信
+
+JoinAccept を受け取った Owner は、**TaskDelegated** メッセージで具体的なタスクを Worker に委任します。
+
+```json
+{
+  "parent_task_id": null,
+  "title": "検索インデックスの構築",
+  "description": "Elasticsearch インデックスを設計・構築する",
+  "objective": "全文検索を実現するインデックス設計",
+  "required_capability": "openclaw.execution.v1",
+  "input_payload": { "target": "search_index" },
+  "expected_output_schema": { "type": "object" }
+}
+```
+
+### タスクステータス遷移
+
+タスクは以下のステータスを遷移します。
+
+```
+queued ──▶ offered ──▶ accepted ──▶ running ──▶ submitted ──▶ completed
+  │                                    │                         │
+  │                                    ▼                         │
+  │                                 stopping ──▶ stopped         │
+  │                                                              │
+  └──────────────────────────────────────────────────────────▶ failed
+```
+
+<ApiTable data={[
+  { name: "queued", description: "タスクがキューに入り、Worker の割り当てを待機中" },
+  { name: "offered", description: "Worker に JoinOffer が送信された" },
+  { name: "accepted", description: "Worker が JoinAccept を返した" },
+  { name: "running", description: "OpenClaw bridge でタスクが実行中" },
+  { name: "submitted", description: "Worker が結果を提出し、評価待ち" },
+  { name: "completed", description: "タスクが正常に完了" },
+  { name: "failed", description: "タスクの実行が失敗" },
+  { name: "stopping", description: "StopOrder を受信し、停止処理中" },
+  { name: "stopped", description: "停止が完了" }
+]} />
+
+### OpenClaw bridge による実行
+
+Worker は OpenClaw バイナリをサブプロセスとして起動し、タスクを実行します。
+
+<Steps>
+### BridgeTaskRequest の送信
+
+タスク情報を JSON 形式で OpenClaw の stdin に書き込みます。
+
+```json
+{
+  "title": "検索インデックスの構築",
+  "description": "...",
+  "objective": "...",
+  "required_capability": "openclaw.execution.v1",
+  "input_payload": { "target": "search_index" }
+}
+```
+
+### 進捗の監視
+
+stdout から `PROGRESS:<float>:<message>` 形式の行を検出し、**TaskProgress** メッセージを Owner に送信します。
+
+```
+PROGRESS:0.3:データスキーマを分析中
+PROGRESS:0.6:インデックスマッピングを生成中
+PROGRESS:0.9:テストデータでインデックスを検証中
+```
+
+### BridgeTaskResponse の解析
+
+プロセス完了後、stdout の最終 JSON 出力を `BridgeTaskResponse` としてパースします。
+
+```json
+{
+  "summary": "検索インデックスを構築しました",
+  "output_payload": { "index_name": "search_v1" },
+  "artifact_refs": []
+}
+```
+
+### タイムアウト制御
+
+`openclaw.timeout_sec` (デフォルト: 3600 秒) を超過すると、プロセスを強制終了し Failed として報告します。
+</Steps>
+
+## 進捗報告
+
+Worker は実行中のタスクの進捗を **TaskProgress** メッセージで Owner に報告します。
+
+```rust
+pub struct TaskProgress {
+    pub progress: f32,      // 0.0 〜 1.0
+    pub message: String,    // 進捗メッセージ
+    pub updated_at: OffsetDateTime,
+}
+```
+
+Owner 側ではプロジェクション (`tasks` テーブル) が更新され、`starweft status` コマンドでリアルタイムに確認できます。
+
+## 結果提出と評価
+
+### TaskResultSubmitted
+
+タスク実行が完了すると、Worker は **TaskResultSubmitted** を Owner に送信します。
+
+```rust
+pub enum TaskExecutionStatus {
+    Completed,  // 正常完了
+    Failed,     // 実行失敗
+    Stopped,    // 停止命令による中断
+}
+```
+
+結果にはアーティファクト参照を含めることができます。
+
+```rust
+pub struct ArtifactRef {
+    pub artifact_id: ArtifactId,
+    pub scheme: String,      // "file"
+    pub uri: String,         // ファイルパス
+    pub sha256: Option<String>,
+    pub size: Option<u64>,
+    pub encryption: Option<ArtifactEncryption>,
+}
+```
+
+### EvaluationIssued
+
+Owner がタスク結果を評価し、**EvaluationIssued** を発行します。評価は 4 次元のスコアで構成されます。
+
+| 次元 | 説明 |
+|------|------|
+| **quality** | 出力の品質 |
+| **speed** | 実行速度 |
+| **reliability** | 信頼性・安定性 |
+| **alignment** | 目標との整合性 |
+
+```json
+{
+  "subject_actor_id": "<worker-actor-id>",
+  "scores": {
+    "quality": 0.85,
+    "speed": 0.70,
+    "reliability": 0.90,
+    "alignment": 0.95
+  },
+  "comment": "高品質な実装。パフォーマンス改善の余地あり。"
+}
+```
+
+## 停止 / キャンセルフロー
+
+StopOrder によるタスク停止は、3 段階のハンドシェイクで安全に行われます。
+
+```
+Principal            Owner               Worker
+   │                   │                   │
+   │──StopOrder───────▶│                   │
+   │                   │──StopOrder───────▶│
+   │                   │                   │ cancel_flag = true
+   │                   │                   │ OpenClaw プロセス停止
+   │                   │◀─StopAck─────────│
+   │◀─StopAck──────────│                   │
+   │                   │◀─StopComplete────│
+   │◀─StopComplete─────│                   │
+   │                   │                   │
+```
+
+<Steps>
+### StopOrder の発行
+
+Principal が `starweft stop` コマンドを実行します。StopOrder には `scope_type` (Project / TaskTree) と `scope_id` を指定します。
+
+```bash
+starweft stop --project <project-id> --reason "方針変更"
+```
+
+### StopOrder の伝播
+
+Owner は StopOrder を受信すると、対象プロジェクトのステータスを `stopping` に変更し、関連する Worker 全員に StopOrder を転送します。
+
+### Worker の停止処理
+
+Worker は以下を実行します:
+1. 対象タスクの **cancel_flag** (`AtomicBool`) を `true` に設定
+2. OpenClaw サブプロセスの終了を待機
+3. **StopAck** (ack_state: `"stopping"`) を Owner に送信
+4. すべての対象タスクが停止した時点で **StopComplete** (final_state: `"stopped"`) を送信
+
+### 停止完了の確認
+
+Owner は Worker からの StopAck / StopComplete を Principal に中継します。プロジェクトのステータスが `stopped` に遷移し、ライフサイクルが終了します。
+</Steps>
+
+<Callout type="warning">
+StopOrder は `stop_authority_key` で署名されます。通常の `actor_key` では署名検証に失敗するため、停止権限を持たないノードが StopOrder を偽造することはできません。
+</Callout>
+
+## リトライ戦略
+
+タスクが失敗した場合、Owner はルールベースのリトライ判定を行います。
+
+### 判定フロー
+
+```
+TaskResultSubmitted (status = Failed)
+    │
+    ▼
+ルールマッチング (summary テキストのパターン照合)
+    │
+    ├── "timeout" / "timed out"
+    │   → 同一 Worker でリトライ
+    │
+    ├── "process failed" / "worker overloaded" / "worker unavailable"
+    │   → 別の Worker でリトライ
+    │
+    ├── "capability mismatch" / "invalid input" / "schema" / "unauthorized"
+    │   → リトライしない (恒久的失敗)
+    │
+    └── パターン不一致
+        → 別の Worker でリトライ (デフォルト)
+```
+
+### リトライ設定
+
+```toml
+[owner]
+max_retry_attempts = 8      # 最大リトライ回数
+retry_cooldown_ms = 250     # リトライ間隔
+retry_strategy = "rule_based"
+
+[[owner.retry_rules]]
+pattern = "timeout"
+action = "retry_same_worker"
+reason = "transient timeout"
+
+[[owner.retry_rules]]
+pattern = "capability mismatch"
+action = "no_retry"
+reason = "permanent task/input failure"
+```
+
+リトライ時、Owner は失敗したタスクの blueprint (元のタスク定義) をコピーし、`parent_task_id` に元のタスク ID を設定した新しいタスクを生成します。
+
+## プロジェクトステータス
+
+プロジェクト全体のステータスは以下を遷移します。
+
+```
+planning ──▶ active ──▶ stopping ──▶ stopped
+```
+
+| ステータス | 条件 |
+|-----------|------|
+| **planning** | ProjectCharter 生成直後。タスクはまだ開始されていない |
+| **active** | タスクが実行中 |
+| **stopping** | StopOrder が発行され、タスクが停止処理中 |
+| **stopped** | すべてのタスクが停止し、プロジェクトが終了 |
+
+<Callout type="tip">
+`starweft status` コマンドでプロジェクトとタスクの現在のステータスを一覧表示できます。`starweft wait` コマンドを使うと、特定のプロジェクトが完了するまでポーリングで待機できます。
+</Callout>

@@ -118,7 +118,7 @@ export default function LandingPage(): ReactNode {
         <p className={`${SECTION_LABEL} mb-4`}>Distributed Multi-Agent Coordination</p>
         <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
           Orchestrate AI Agents{" "}
-          <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-yellow-400 to-amber-300 bg-clip-text text-transparent">
             Across Machines
           </span>
         </h1>

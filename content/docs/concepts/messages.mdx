@@ -3,4 +3,419 @@ title: "Messages"
 description: "How messages are structured, signed, and delivered between nodes."
 ---
 
-Content coming soon. This section will cover how messages are structured, signed with Ed25519, serialized as canonical JSON, and delivered between nodes through the inbox/outbox pipeline.
+## メッセージの概要
+
+Starweft のノード間通信はすべて **署名付きエンベロープ** で行われます。各メッセージは `MsgType` で型付けされ、canonical JSON シリアライズと Ed25519 署名により改ざんを防止します。
+
+## エンベロープ構造
+
+メッセージは 3 段階のエンベロープ形式を経由して送受信されます。
+
+### UnsignedEnvelope
+
+署名前のエンベロープです。メッセージ生成時にフィールドを設定し、`sign()` で署名済みエンベロープに変換します。
+
+```rust
+pub struct UnsignedEnvelope<T> {
+    pub protocol: String,           // "starweft/0.1"
+    pub msg_id: MessageId,          // ULID ベースの一意 ID
+    pub msg_type: MsgType,          // メッセージ種別
+    pub from_actor_id: ActorId,     // 送信者のアクター ID
+    pub to_actor_id: Option<ActorId>, // 宛先 (None = ブロードキャスト)
+    pub vision_id: Option<VisionId>,
+    pub project_id: Option<ProjectId>,
+    pub task_id: Option<TaskId>,
+    pub lamport_ts: u64,            // Lamport 論理タイムスタンプ
+    pub created_at: OffsetDateTime, // 作成日時
+    pub expires_at: Option<OffsetDateTime>, // 有効期限
+    pub body: T,                    // 型付きメッセージボディ
+}
+```
+
+### Envelope (署名済み)
+
+`UnsignedEnvelope.sign(keypair)` で生成される署名済みエンベロープです。`MessageSignature` が付与されています。
+
+```rust
+pub struct Envelope<T> {
+    // ... UnsignedEnvelope と同じフィールド ...
+    pub body: T,
+    pub signature: MessageSignature,  // Ed25519 署名
+}
+```
+
+### WireEnvelope (ワイヤー形式)
+
+ネットワーク転送時の形式です。body が型付き `T` から `serde_json::Value` (untyped JSON) に変換されています。
+
+```rust
+pub struct WireEnvelope {
+    // ... Envelope と同じフィールド ...
+    pub body: Value,               // 非型付き JSON
+    pub signature: MessageSignature,
+}
+```
+
+<Callout type="info">
+受信側では `WireEnvelope.decode::<T>()` で `msg_type` に基づいて型付き `Envelope<T>` にデシリアライズし、`verify_with_key()` で署名を検証します。
+</Callout>
+
+## Canonical JSON シリアライズ
+
+署名の決定性を保証するため、署名対象は **canonical JSON** にシリアライズされます。
+
+- JSON キーはアルファベット順にソート
+- 不要な空白は除去
+- 浮動小数点や日時の表現は `serde_json` のデフォルト出力に準拠
+
+署名対象には body を含むエンベロープの全フィールドが含まれますが、`signature` フィールド自体は含まれません。
+
+```rust
+// 署名対象の構造体
+struct SignableEnvelope<'a, T> {
+    protocol: &'a str,
+    msg_id: &'a MessageId,
+    msg_type: &'a MsgType,
+    from_actor_id: &'a ActorId,
+    to_actor_id: &'a Option<ActorId>,
+    vision_id: &'a Option<VisionId>,
+    project_id: &'a Option<ProjectId>,
+    task_id: &'a Option<TaskId>,
+    lamport_ts: u64,
+    created_at: OffsetDateTime,
+    expires_at: &'a Option<OffsetDateTime>,
+    body: &'a T,
+}
+```
+
+## メッセージタイプ一覧
+
+Starweft プロトコルは以下のメッセージタイプを定義しています。
+
+### ビジョン・プロジェクト
+
+<Accordion title="VisionIntent">
+Principal が投入するビジョン (目標定義) です。Owner がこれを受け取り、プロジェクトとタスクに分解します。
+
+```rust
+pub struct VisionIntent {
+    pub title: String,              // ビジョンのタイトル
+    pub raw_vision_text: String,    // 自由記述のビジョンテキスト
+    pub constraints: VisionConstraints, // 実行制約
+}
+```
+
+**送信**: Principal → Owner
+</Accordion>
+
+<Accordion title="ProjectCharter">
+Owner がビジョンから生成するプロジェクト憲章です。プロジェクトの構造と評価ポリシーを定義します。
+
+```rust
+pub struct ProjectCharter {
+    pub project_id: ProjectId,
+    pub vision_id: VisionId,
+    pub principal_actor_id: ActorId,     // 依頼元
+    pub owner_actor_id: ActorId,         // オーケストレーター
+    pub title: String,
+    pub objective: String,
+    pub stop_authority_actor_id: ActorId, // 停止権限者
+    pub participant_policy: ParticipantPolicy,
+    pub evaluation_policy: EvaluationPolicy,
+}
+```
+
+**送信**: Owner → Principal (+ ブロードキャスト)
+</Accordion>
+
+### ケイパビリティ発見
+
+<Accordion title="CapabilityQuery">
+ノードが自身のアイデンティティとケイパビリティを通知し、ピアのケイパビリティを問い合わせます。
+
+```rust
+pub struct CapabilityQuery {
+    pub node_id: NodeId,
+    pub public_key: String,          // Base64 公開鍵
+    pub stop_public_key: Option<String>,
+    pub capabilities: Vec<String>,   // e.g. ["openclaw.execution.v1"]
+    pub listen_addresses: Vec<String>,
+    pub requested_at: OffsetDateTime,
+}
+```
+
+**送信**: 全ロール → ブロードキャスト
+
+**特記**: このメッセージは自己証明的に検証されます (body 内の `public_key` で署名を検証)。事前のピア公開鍵登録は不要です。
+</Accordion>
+
+<Accordion title="CapabilityAdvertisement">
+CapabilityQuery への応答として、自ノードのケイパビリティを通知します。
+
+```rust
+pub struct CapabilityAdvertisement {
+    pub node_id: NodeId,
+    pub public_key: String,
+    pub stop_public_key: Option<String>,
+    pub capabilities: Vec<String>,
+    pub listen_addresses: Vec<String>,
+    pub advertised_at: OffsetDateTime,
+}
+```
+
+**送信**: 全ロール → クエリ送信元
+</Accordion>
+
+### 参加制御
+
+<Accordion title="JoinOffer">
+Owner が Worker にプロジェクト参加を提案します。必要なケイパビリティとタスク概要を含みます。
+
+```rust
+pub struct JoinOffer {
+    pub required_capabilities: Vec<String>,
+    pub task_outline: String,
+    pub expected_duration_sec: u64,
+}
+```
+
+**送信**: Owner → Worker
+</Accordion>
+
+<Accordion title="JoinAccept">
+Worker が JoinOffer を受諾します。
+
+```rust
+pub struct JoinAccept {
+    pub accepted: bool,                    // true
+    pub capabilities_confirmed: Vec<String>,
+}
+```
+
+**送信**: Worker → Owner
+</Accordion>
+
+<Accordion title="JoinReject">
+Worker が JoinOffer を拒否します。
+
+```rust
+pub struct JoinReject {
+    pub accepted: bool,   // false
+    pub reason: String,
+}
+```
+
+**送信**: Worker → Owner
+</Accordion>
+
+### タスク実行
+
+<Accordion title="TaskDelegated">
+Owner が Worker にタスクを委任します。入力データと期待する出力スキーマを含みます。
+
+```rust
+pub struct TaskDelegated {
+    pub parent_task_id: Option<TaskId>, // 親タスク (サブタスクの場合)
+    pub title: String,
+    pub description: String,
+    pub objective: String,
+    pub required_capability: String,
+    pub input_payload: Value,            // タスクへの入力データ
+    pub expected_output_schema: Value,   // 期待する出力の JSON Schema
+}
+```
+
+**送信**: Owner → Worker
+</Accordion>
+
+<Accordion title="TaskProgress">
+Worker がタスクの進捗を報告します。OpenClaw bridge の `PROGRESS:<float>:<message>` 出力から自動生成されます。
+
+```rust
+pub struct TaskProgress {
+    pub progress: f32,      // 0.0 〜 1.0
+    pub message: String,
+    pub updated_at: OffsetDateTime,
+}
+```
+
+**送信**: Worker → Owner
+</Accordion>
+
+<Accordion title="TaskResultSubmitted">
+Worker がタスクの実行結果を提出します。
+
+```rust
+pub struct TaskResultSubmitted {
+    pub status: TaskExecutionStatus,  // Completed / Failed / Stopped
+    pub summary: String,
+    pub output_payload: Value,
+    pub artifact_refs: Vec<ArtifactRef>,
+    pub started_at: OffsetDateTime,
+    pub finished_at: OffsetDateTime,
+}
+```
+
+**送信**: Worker → Owner
+</Accordion>
+
+<Accordion title="EvaluationIssued">
+Owner がタスク結果を評価して発行する評価証明書です。
+
+```rust
+pub struct EvaluationIssued {
+    pub subject_actor_id: ActorId,       // 評価対象の Worker
+    pub scores: BTreeMap<String, f32>,   // quality, speed, reliability, alignment
+    pub comment: String,
+}
+```
+
+**送信**: Owner → Worker (+ ブロードキャスト)
+</Accordion>
+
+### 停止制御
+
+<Accordion title="StopOrder">
+プロジェクトまたはタスクツリーの停止命令です。`stop_authority_key` で署名されます。
+
+```rust
+pub struct StopOrder {
+    pub stop_id: StopId,
+    pub scope_type: StopScopeType,  // Project / TaskTree
+    pub scope_id: String,
+    pub reason_code: String,        // e.g. "misalignment"
+    pub reason_text: String,
+    pub issued_at: OffsetDateTime,
+}
+```
+
+**送信**: Principal → Owner → Worker
+</Accordion>
+
+<Accordion title="StopAck">
+StopOrder を受信し、停止処理を開始したことの確認応答です。
+
+```rust
+pub struct StopAck {
+    pub stop_id: StopId,
+    pub actor_id: ActorId,
+    pub ack_state: StopAckState,  // Stopping
+    pub acked_at: OffsetDateTime,
+}
+```
+
+**送信**: Worker → Owner → Principal
+</Accordion>
+
+<Accordion title="StopComplete">
+停止処理が完了したことの最終確認です。
+
+```rust
+pub struct StopComplete {
+    pub stop_id: StopId,
+    pub actor_id: ActorId,
+    pub final_state: StopFinalState,  // Stopped
+    pub completed_at: OffsetDateTime,
+}
+```
+
+**送信**: Worker → Owner → Principal
+</Accordion>
+
+### スナップショット
+
+<Accordion title="SnapshotRequest / SnapshotResponse">
+プロジェクトまたはタスクの状態スナップショットを要求・返却します。
+
+```rust
+pub struct SnapshotRequest {
+    pub scope_type: SnapshotScopeType,  // Project / Task
+    pub scope_id: String,
+}
+
+pub struct SnapshotResponse {
+    pub scope_type: SnapshotScopeType,
+    pub scope_id: String,
+    pub snapshot: Value,
+}
+```
+
+**送信**: Principal → Owner (Request) / Owner → Principal (Response)
+</Accordion>
+
+### パブリッシュ
+
+<Accordion title="PublishIntentProposed / PublishIntentSkipped / PublishResultRecorded">
+タスク結果の外部公開 (GitHub など) に関するメッセージ群です。
+
+- **PublishIntentProposed**: 公開提案
+- **PublishIntentSkipped**: 公開スキップ通知
+- **PublishResultRecorded**: 公開結果の記録
+
+**送信**: Owner 内部で生成・記録
+</Accordion>
+
+### 承認制御
+
+<Accordion title="ApprovalGranted / ApprovalApplied">
+タスク実行前の承認ゲートを制御するメッセージです。
+
+- **ApprovalGranted**: Principal がプロジェクトまたはタスクの実行を承認
+- **ApprovalApplied**: Owner が承認を適用し、一時停止中のタスクを再開
+
+```rust
+pub struct ApprovalGranted {
+    pub scope_type: ApprovalScopeType,  // Project / Task
+    pub scope_id: String,
+    pub approved_at: OffsetDateTime,
+}
+```
+
+**送信**: Principal → Owner (Granted) / Owner → Principal (Applied)
+</Accordion>
+
+## outbox パイプラインによる配送
+
+すべてのメッセージは outbox キューを経由して配送されます。
+
+```
+queue_outgoing(envelope)
+    │
+    ▼
+outbox_messages (delivery_state = "queued")
+    │
+    ▼ flush_outbox()
+    │
+    ├── to_actor_id あり → peer_addresses から対象ピアを検索
+    │
+    ├── to_actor_id なし → 全ピアにブロードキャスト
+    │                      (relay ノードは送信元を除外)
+    │
+    ▼ transport.deliver()
+    │
+    ├── 成功 → delivery_state = "delivered_local"
+    ├── 失敗 → リトライ (250ms 間隔, 最大 20 回)
+    └── 上限超過 → delivery_state = "dead_letter"
+```
+
+<Callout type="tip">
+配送先が複数ある場合、個別の `outbox_deliveries` レコードで配送状態を追跡します。すべてのターゲットに配送完了すると、outbox メッセージ全体が delivered 状態になります。
+</Callout>
+
+## メッセージの有効期限
+
+エンベロープに `expires_at` が設定されている場合、受信側は現在時刻 + 30 秒のスキュー許容を超えていればメッセージを拒否します。
+
+```rust
+const ENVELOPE_EXPIRY_SKEW_SEC: i64 = 30;
+```
+
+## プロトコルバージョン
+
+現在のプロトコルバージョンは `"starweft/0.1"` です。受信メッセージのプロトコルバージョンが異なる場合、`allow_legacy_protocols = true` が設定されていなければ拒否されます。
+
+```toml
+[compatibility]
+protocol_version = "starweft/0.1"
+allow_legacy_protocols = false
+```

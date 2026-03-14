@@ -3,4 +3,137 @@ title: "Environment Variables"
 description: "Environment variables that affect Starweft behavior."
 ---
 
-Content coming soon. This section will cover all environment variables that affect Starweft behavior, including token precedence, data directory overrides, and debugging options.
+## 概要
+
+Starweft の動作に影響する環境変数の一覧です。Starweft は P2P CLI ツールであり、すべてローカルマシン上で動作するため、環境変数はプロセスごとに設定します。
+
+---
+
+## 環境変数一覧
+
+<ApiTable data={[
+  { flag: "STARWEFT_GITHUB_TOKEN", type: "string", default: "-", description: "GitHub API 認証トークン。publish github コマンドで使用。最優先" },
+  { flag: "GITHUB_TOKEN", type: "string", default: "-", description: "GitHub API 認証トークン。STARWEFT_GITHUB_TOKEN が未設定時にフォールバック" },
+  { flag: "GH_TOKEN", type: "string", default: "-", description: "GitHub API 認証トークン。上記 2 つが未設定時にフォールバック" },
+  { flag: "STARWEFT_GITHUB_API_BASE_URL", type: "string", default: "https://api.github.com", description: "GitHub API のベース URL。GitHub Enterprise 等で変更する場合に使用" },
+  { flag: "STARWEFT_REGISTRY_SHARED_SECRET", type: "string", default: "-", description: "レジストリ認証用の共有シークレット。registry serve の --shared-secret フラグと同等" },
+  { flag: "RUST_LOG", type: "string", default: "info", description: "ログフィルタ。-v/-q フラグや --log-level, config の log_level が未指定時にフォールバック" },
+]} />
+
+---
+
+## GitHub トークンの優先順位
+
+`starweft publish github` コマンドは、以下の優先順位で GitHub API トークンを解決します。
+
+<Steps>
+
+### STARWEFT_GITHUB_TOKEN
+
+Starweft 専用のトークン。他のツールとの競合を避けたい場合に使用します。
+
+### GITHUB_TOKEN
+
+GitHub Actions やその他のツールで広く使われる汎用トークン。
+
+### GH_TOKEN
+
+GitHub CLI (`gh`) が使用するトークン。
+
+</Steps>
+
+いずれも設定されていない場合、`[E_GITHUB_TOKEN_MISSING]` エラーが発生します。
+
+```bash
+# 推奨: Starweft 専用トークンを設定
+export STARWEFT_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+
+# または既存の GitHub CLI トークンを流用
+# (gh auth token の出力を使う場合)
+export GH_TOKEN=$(gh auth token)
+```
+
+<Callout type="warning">
+トークンには対象リポジトリへの書き込み権限 (repo スコープ) が必要です。Issue や Pull Request にコメントを投稿するために使用されます。
+</Callout>
+
+---
+
+## レジストリ認証
+
+`starweft registry serve` コマンドは `STARWEFT_REGISTRY_SHARED_SECRET` 環境変数から共有シークレットを読み取れます。CLI フラグ (`--shared-secret`) でも指定可能です。
+
+```bash
+export STARWEFT_REGISTRY_SHARED_SECRET="your-secret-here"
+starweft registry serve --bind 0.0.0.0:7777
+```
+
+`config.toml` の `discovery.registry_shared_secret_env` を使うと、クライアント側でもシークレットを環境変数経由で渡せます。
+
+```toml
+[discovery]
+registry_url = "http://registry.local:7777"
+registry_shared_secret_env = "MY_REGISTRY_SECRET"
+```
+
+<Callout type="tip">
+`config.toml` にシークレットを直接記載するよりも、`registry_shared_secret_env` で環境変数名を指定する方法を推奨します。設定ファイルをバージョン管理に含める際にシークレットの漏洩を防げます。
+</Callout>
+
+---
+
+## ログレベル制御
+
+ログレベルの解決は以下の優先順位で行われます。
+
+<Steps>
+
+### CLI フラグ (-v / -q)
+
+`-v` で debug、`-vv` で trace。`-q` で warn、`-qq` で error。最優先です。
+
+### --log-level フラグ (run コマンド)
+
+`starweft run --log-level debug` のように指定。
+
+### config.toml の node.log_level
+
+設定ファイルの値。`starweft run` 時のみ参照されます。
+
+### RUST_LOG 環境変数
+
+上記がすべて未指定時のフォールバック。
+
+### デフォルト値 (info)
+
+いずれも未設定の場合は `info` レベルが使用されます。
+
+</Steps>
+
+```bash
+# すべてのコマンドで debug ログを出力
+starweft -v status
+
+# run コマンドで trace ログを出力
+starweft run --log-level trace
+
+# RUST_LOG でモジュール単位の制御
+RUST_LOG="starweft=debug,starweft_p2p=trace" starweft run
+```
+
+---
+
+## GitHub Enterprise 対応
+
+`STARWEFT_GITHUB_API_BASE_URL` を設定すると、GitHub Enterprise Server の API エンドポイントを使用できます。
+
+```bash
+export STARWEFT_GITHUB_API_BASE_URL="https://github.example.com/api/v3"
+export STARWEFT_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+
+starweft publish github --repo org/repo --issue 42
+```
+
+<Callout type="info">
+末尾のスラッシュは自動的に除去されます。
+</Callout>

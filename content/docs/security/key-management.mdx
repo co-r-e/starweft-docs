@@ -3,4 +3,220 @@ title: "Key Management"
 description: "Managing Ed25519 keys, file permissions, and identity lifecycle."
 ---
 
-Content coming soon. This section will cover managing Ed25519 keys, including key generation, file permission requirements (0600 on Unix), identity lifecycle, and platform-specific considerations.
+## 概要
+
+Starweft のセキュリティモデルは **Ed25519 鍵ペア**に基づいています。各ノードは最低 1 つの鍵ペア（`actor_key`）を持ち、すべてのプロトコルメッセージに署名します。principal ノードはさらに停止権限用の鍵ペア（`stop_authority_key`）を持ちます。
+
+## 鍵の種類
+
+<ApiTable data={[
+  { name: "actor_key", description: "ノードの主 identity 鍵。全メッセージの署名に使用される。すべてのロールで必須。" },
+  { name: "stop_authority_key", description: "停止命令 (StopOrder) の署名に使用される専用鍵。principal ノードで生成される。" }
+]} />
+
+### actor_key
+
+`actor_key` はノードのメイン identity です。プロトコル上のすべてのメッセージ（`VisionIntent`、`TaskDelegated`、`TaskResultSubmitted` など）がこの鍵で署名されます。公開鍵はピア間で共有され、署名検証に使用されます。
+
+### stop_authority_key
+
+`stop_authority_key` はプロジェクトやタスクツリーの停止命令 (`StopOrder`) を発行する権限を示す鍵です。`ProjectCharter` の `stop_authority_actor_id` に登録されたアクターだけが有効な停止命令を発行できます。
+
+<Callout type="info">
+`stop_authority_key` は principal ノード、または `--principal` フラグ付きで `identity create` を実行したノードにのみ生成されます。worker や relay ノードは通常この鍵を持ちません。
+</Callout>
+
+## 鍵の生成
+
+`identity create` コマンドで Ed25519 鍵ペアを生成します。
+
+<Tabs items="worker / owner / relay,principal">
+
+```bash
+# worker / owner / relay ノード: actor_key のみ生成
+starweft identity create
+```
+
+```bash
+# principal ノード: actor_key + stop_authority_key を生成
+starweft identity create --principal
+```
+
+</Tabs>
+
+生成時の処理は以下の通りです。
+
+<Steps>
+
+### 鍵ペアの生成
+
+`ed25519-dalek` の `SigningKey::generate()` を使用し、OS の暗号安全乱数生成器 (`OsRng`) から Ed25519 鍵ペアを生成します。
+
+### ファイルへの保存
+
+鍵ペアは JSON 形式でファイルに書き出されます。
+
+```json
+{
+  "key_id": "key_01JXYZ...",
+  "created_at": "2026-03-15T10:00:00Z",
+  "secret_key": "<base64-encoded 32 bytes>",
+  "public_key": "<base64-encoded 32 bytes>"
+}
+```
+
+### パーミッションの設定
+
+秘密鍵ファイルは所有者のみ読み書き可能な権限で保護されます（後述）。
+
+### identity の登録
+
+`ActorId` と `NodeId` が自動生成され、SQLite ストアの `local_identity` テーブルに登録されます。設定ファイル (`config.toml`) の `identity.actor_key_path` も自動更新されます。
+
+</Steps>
+
+### 鍵の上書き
+
+既存の鍵がある場合、`--force` フラグで上書きできます。
+
+```bash
+starweft identity create --force
+```
+
+<Callout type="warning">
+`--force` による上書きは**不可逆操作**です。古い鍵で署名されたメッセージは、新しい鍵では検証できなくなります。上書き前に必ず `backup create` でバックアップを取ってください。
+</Callout>
+
+## ファイルの保管場所
+
+鍵ファイルはデータディレクトリの `identity/` サブディレクトリに保存されます。
+
+<FileTree data={[
+  { name: "~/.starweft/", children: [
+    { name: "config.toml" },
+    { name: "identity/", children: [
+      { name: "actor_key", comment: "メイン identity 鍵" },
+      { name: "stop_authority_key", comment: "停止権限鍵 (principal のみ)" }
+    ]}
+  ]}
+]} />
+
+### config.toml でのパス設定
+
+設定ファイルの `[identity]` セクションで鍵ファイルのパスを指定できます。
+
+```toml
+[identity]
+actor_key_path = "~/.starweft/identity/actor_key"
+stop_authority_key_path = "~/.starweft/identity/stop_authority_key"
+```
+
+`identity create` コマンドは設定に指定されたパスに鍵を生成し、未設定の場合はデフォルトパス (`<data_dir>/identity/actor_key`) を使用して設定を自動更新します。
+
+## ファイルパーミッション
+
+秘密鍵ファイルの不正アクセスを防ぐため、プラットフォームごとに適切なパーミッションが設定されます。
+
+<Tabs items="Unix (macOS / Linux),Windows">
+
+### Unix
+
+- **鍵ファイル**: `0600`（所有者のみ読み書き可能）
+- **identity ディレクトリ**: `0700`（所有者のみアクセス可能）
+- **config.toml**: `0600`（所有者のみ読み書き可能）
+
+```bash
+$ ls -la ~/.starweft/identity/
+-rw-------  1 user  user  256 Mar 15 10:00 actor_key
+-rw-------  1 user  user  256 Mar 15 10:00 stop_authority_key
+```
+
+### Windows
+
+- **鍵ファイル**: `icacls` でカレントユーザーのみにフルコントロール (`(F)`) を付与し、継承を削除 (`/inheritance:r`)
+- **データディレクトリ**: `icacls` でユーザーに `(OI)(CI)F`（オブジェクト継承・コンテナ継承付きフルコントロール）を付与
+- **鍵ファイルの読み取り専用属性**: 上書き時に一時解除し、書き込み後に再設定
+
+<Callout type="info">
+Windows では `icacls` コマンドが利用できない環境もあります。その場合、ACL 設定はスキップされますが警告ログが出力されます。
+</Callout>
+
+</Tabs>
+
+## 公開鍵の交換
+
+ピア間で公開鍵を共有する方法は 2 つあります。
+
+### 手動交換: `peer add`
+
+`identity show` で取得した公開鍵を、相手ノードで `peer add` コマンドにより登録します。
+
+```bash
+# ノード A の公開鍵を確認
+starweft identity show
+# 出力例: public_key: dGVzdC1wdWJsaWMta2V5...
+
+# ノード B でノード A を登録
+starweft peer add /ip4/192.168.1.10/tcp/9000 \
+  --public-key "dGVzdC1wdWJsaWMta2V5..." \
+  --stop-public-key "c3RvcC1wdWJsaWMta2V5..." \
+  --actor-id "actor_01ABC..." \
+  --node-id "node_01DEF..."
+```
+
+公開鍵はファイルから読み込むこともできます。
+
+```bash
+starweft peer add /ip4/192.168.1.10/tcp/9000 \
+  --public-key-file ./peer_a_pubkey.txt \
+  --stop-public-key-file ./peer_a_stop_pubkey.txt
+```
+
+### 自動交換: CapabilityQuery / CapabilityAdvertisement
+
+ノード起動時に `CapabilityQuery` メッセージをブロードキャストし、`CapabilityAdvertisement` で応答を受け取ることで公開鍵が自動交換されます。
+
+```json
+{
+  "msg_type": "CapabilityQuery",
+  "body": {
+    "node_id": "node_01ABC...",
+    "public_key": "<base64 actor public key>",
+    "stop_public_key": "<base64 stop public key or null>",
+    "capabilities": ["openclaw.execution.v1"],
+    "listen_addresses": ["/ip4/192.168.1.10/tcp/9000"]
+  }
+}
+```
+
+交換された公開鍵は SQLite ストアの `peer_identities` テーブルに保存され、以降のメッセージ署名検証に使用されます。
+
+<Callout type="warning">
+自動交換は利便性のための仕組みです。信頼できないネットワーク環境では、手動での `peer add` による公開鍵登録を推奨します。
+</Callout>
+
+## 鍵のバックアップ
+
+鍵ファイルは `backup create` コマンドでデータディレクトリ全体とともにバックアップできます。
+
+```bash
+starweft backup create --output ~/starweft-backup
+```
+
+バックアップには以下が含まれます。
+
+- `identity/actor_key` -- メイン identity 鍵
+- `identity/stop_authority_key` -- 停止権限鍵（存在する場合）
+- `config.toml` -- 鍵パス設定を含む設定ファイル
+- `ledger/node.db` -- イベントログ・ピア情報を含む SQLite データベース
+
+<Callout type="error">
+**秘密鍵を紛失すると、そのノードの identity は回復できません。** 他ノードに登録された公開鍵との対応も失われます。定期的なバックアップを強く推奨します。
+</Callout>
+
+バックアップの詳細については [監査ページ](/docs/security/audit) を参照してください。
+
+## 関連ページ
+
+<LinkCard href="/docs/security/signing" title="メッセージ署名" description="Ed25519 署名と Canonical JSON による完全性保証" />
+<LinkCard href="/docs/security/audit" title="監査" description="イベントログの署名検証とバックアップの整合性チェック" />

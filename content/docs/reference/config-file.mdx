@@ -3,4 +3,402 @@ title: "Configuration File"
 description: "Full reference for the starweft.toml configuration file."
 ---
 
-Content coming soon. This section will cover a full reference for every field in the starweft.toml configuration file, including data types, defaults, and validation rules.
+## 概要
+
+Starweft の設定は `config.toml` で管理されます。`starweft init` で自動生成され、デフォルトではデータディレクトリ直下 (`~/.starweft/config.toml`) に配置されます。
+
+```bash
+# 現在の設定を表示
+starweft config show
+
+# 設定の検証
+starweft config validate
+```
+
+<Callout type="info">
+`config show` は秘密情報 (registry_shared_secret など) をマスクして表示します。
+</Callout>
+
+---
+
+## [node]
+
+ノードの基本設定です。
+
+<ApiTable data={[
+  { flag: "role", type: "string", default: "-", description: "ノードの役割。principal / owner / worker / relay のいずれか" },
+  { flag: "display_name", type: "string", default: "\"<role>-node\"", description: "ノードの表示名" },
+  { flag: "data_dir", type: "string", default: "\"~/.starweft\"", description: "データディレクトリのパス。~ はホームディレクトリに展開される" },
+  { flag: "listen", type: "string[]", default: "自動生成", description: "リッスンアドレスのリスト (multiaddr 形式)" },
+  { flag: "log_level", type: "string", default: "\"info\"", description: "ログレベル。trace / debug / info / warn / error" },
+]} />
+
+```toml
+[node]
+role = "worker"
+display_name = "worker-01"
+data_dir = "~/.starweft-worker"
+listen = ["/unix/~/.starweft-worker/mailbox.sock"]
+log_level = "info"
+```
+
+<Callout type="tip">
+Unix ではデフォルトで Unix ソケット (`/unix/...`) が使われます。Windows では TCP (`/ip4/127.0.0.1/tcp/0`) が使われます。
+</Callout>
+
+---
+
+## [identity]
+
+Ed25519 鍵ファイルのパスを指定します。`starweft identity create` で自動設定されます。
+
+<ApiTable data={[
+  { flag: "actor_key_path", type: "string | null", default: "null", description: "actor 鍵ファイルのパス。署名に使用" },
+  { flag: "stop_authority_key_path", type: "string | null", default: "null", description: "stop authority 鍵ファイルのパス。principal が stop 命令に署名する際に使用" },
+]} />
+
+```toml
+[identity]
+actor_key_path = "~/.starweft/identity/actor_key"
+stop_authority_key_path = "~/.starweft/identity/stop_authority_key"
+```
+
+<Callout type="warning">
+鍵ファイルは 0600 パーミッション (Unix) で保護されます。手動で作成した場合はパーミッションを確認してください。
+</Callout>
+
+---
+
+## [discovery]
+
+ピアディスカバリの設定です。
+
+<ApiTable data={[
+  { flag: "seeds", type: "string[]", default: "[]", description: "初期接続先ピアの multiaddr リスト" },
+  { flag: "auto_discovery", type: "bool", default: "true", description: "ピアからの自動ディスカバリを有効化" },
+  { flag: "mdns", type: "bool", default: "libp2p 時 true", description: "mDNS によるローカルネットワークディスカバリ (v0.3.0 で追加。transport=libp2p 時のデフォルト)" },
+  { flag: "registry_url", type: "string | null", default: "null", description: "レジストリサーバーの URL" },
+  { flag: "registry_ttl_sec", type: "u64", default: "300", description: "レジストリエントリの TTL (秒)" },
+  { flag: "registry_heartbeat_sec", type: "u64", default: "60", description: "レジストリへのハートビート間隔 (秒)" },
+  { flag: "registry_shared_secret", type: "string | null", default: "null", description: "レジストリ認証用の共有シークレット (直接指定)" },
+  { flag: "registry_shared_secret_env", type: "string | null", default: "null", description: "共有シークレットを格納する環境変数名" },
+]} />
+
+```toml
+[discovery]
+seeds = ["/unix/~/.starweft-owner/mailbox.sock"]
+auto_discovery = true
+mdns = false
+registry_url = "http://127.0.0.1:7777"
+registry_ttl_sec = 300
+registry_heartbeat_sec = 60
+```
+
+<Callout type="tip">
+`registry_shared_secret` を `config.toml` に直接書く代わりに `registry_shared_secret_env` で環境変数名を指定すると、設定ファイルにシークレットを残さずに済みます。
+</Callout>
+
+---
+
+## [p2p]
+
+P2P トランスポートの設定です。
+
+<ApiTable data={[
+  { flag: "transport", type: "string", default: "Unix: \"local_mailbox\" / Windows: \"libp2p\"", description: "トランスポート種別。local_mailbox (Unix ソケット) または libp2p (TCP)" },
+  { flag: "relay_enabled", type: "bool", default: "true", description: "relay ノード経由の通信を有効化" },
+  { flag: "direct_preferred", type: "bool", default: "true", description: "直接接続を優先" },
+  { flag: "max_peers", type: "u16", default: "128", description: "接続可能なピアの最大数" },
+]} />
+
+```toml
+[p2p]
+transport = "local_mailbox"
+relay_enabled = true
+direct_preferred = true
+max_peers = 128
+```
+
+---
+
+## [ledger]
+
+イベントソーシング用 SQLite データベースの設定です。
+
+<ApiTable data={[
+  { flag: "path", type: "string", default: "\"<data_dir>/ledger/node.db\"", description: "SQLite データベースファイルのパス" },
+]} />
+
+```toml
+[ledger]
+path = "~/.starweft/ledger/node.db"
+```
+
+---
+
+## [openclaw]
+
+OpenClaw サブプロセスの設定です。主に **worker** ロールで使用します。
+
+<ApiTable data={[
+  { flag: "enabled", type: "bool", default: "false", description: "OpenClaw 統合を有効化" },
+  { flag: "bin", type: "string", default: "\"openclaw\"", description: "OpenClaw バイナリのパスまたはコマンド名" },
+  { flag: "working_dir", type: "string | null", default: "null", description: "OpenClaw サブプロセスの作業ディレクトリ" },
+  { flag: "timeout_sec", type: "u64", default: "3600", description: "タスク実行タイムアウト (秒)" },
+  { flag: "capability_version", type: "string", default: "\"openclaw.execution.v1\"", description: "OpenClaw ブリッジの capability バージョン" },
+]} />
+
+```toml
+[openclaw]
+enabled = true
+bin = "/usr/local/bin/openclaw"
+working_dir = "/home/user/workspace"
+timeout_sec = 3600
+capability_version = "openclaw.execution.v1"
+```
+
+---
+
+## [compatibility]
+
+プロトコルとスキーマのバージョン互換性を制御します。
+
+<ApiTable data={[
+  { flag: "protocol_version", type: "string", default: "\"starweft/0.1\"", description: "メッセージプロトコルのバージョン" },
+  { flag: "schema_version", type: "string", default: "自動 (現在の store バージョン)", description: "ストアスキーマのバージョン" },
+  { flag: "bridge_capability_version", type: "string", default: "\"openclaw.execution.v1\"", description: "OpenClaw ブリッジの capability バージョン。openclaw.capability_version と一致する必要がある" },
+  { flag: "allow_legacy_protocols", type: "bool", default: "false", description: "旧バージョンプロトコルのメッセージを許容" },
+]} />
+
+```toml
+[compatibility]
+protocol_version = "starweft/0.1"
+schema_version = "starweft-store/3"
+bridge_capability_version = "openclaw.execution.v1"
+allow_legacy_protocols = false
+```
+
+<Callout type="warning">
+`bridge_capability_version` と `openclaw.capability_version` が一致しない場合、ランタイム起動時に `[E_BRIDGE_CAPABILITY_VERSION]` エラーが発生します。
+</Callout>
+
+---
+
+## [owner]
+
+**owner** ロール固有の設定です。タスク失敗時のリトライポリシーを制御します。
+
+<ApiTable data={[
+  { flag: "max_retry_attempts", type: "u64", default: "8", description: "最大リトライ回数" },
+  { flag: "retry_cooldown_ms", type: "u64", default: "250", description: "リトライ間隔 (ミリ秒)" },
+  { flag: "retry_strategy", type: "string", default: "\"rule_based\"", description: "リトライ戦略。現在は rule_based のみ" },
+  { flag: "retry_rules", type: "OwnerRetryRule[]", default: "デフォルトルールセット", description: "パターンベースのリトライルール (下記参照)" },
+]} />
+
+### retry_rules
+
+各ルールは `pattern` (エラーメッセージの部分一致)、`action` (リトライ動作)、`reason` (ログ用理由) で構成されます。
+
+**action の値:**
+- `retry_same_worker` -- 同じ worker でリトライ
+- `retry_different_worker` -- 別の worker でリトライ
+- `no_retry` -- リトライしない
+
+```toml
+[owner]
+max_retry_attempts = 8
+retry_cooldown_ms = 250
+retry_strategy = "rule_based"
+
+[[owner.retry_rules]]
+pattern = "timeout"
+action = "retry_same_worker"
+reason = "transient timeout"
+
+[[owner.retry_rules]]
+pattern = "process failed"
+action = "retry_different_worker"
+reason = "transient execution failure"
+
+[[owner.retry_rules]]
+pattern = "capability mismatch"
+action = "no_retry"
+reason = "permanent task/input failure"
+```
+
+<Accordion title="デフォルトリトライルール一覧">
+
+| pattern | action | reason |
+|---|---|---|
+| `timeout` | `retry_same_worker` | transient timeout |
+| `timed out` | `retry_same_worker` | transient timeout |
+| `process failed` | `retry_different_worker` | transient execution failure |
+| `worker overloaded` | `retry_different_worker` | transient execution failure |
+| `worker unavailable` | `retry_different_worker` | transient execution failure |
+| `capability mismatch` | `no_retry` | permanent task/input failure |
+| `invalid input` | `no_retry` | permanent task/input failure |
+| `schema` | `no_retry` | permanent task/input failure |
+| `unauthorized` | `no_retry` | permanent task/input failure |
+
+</Accordion>
+
+---
+
+## [worker]
+
+**worker** ロール固有の設定です。
+
+<ApiTable data={[
+  { flag: "accept_join_offers", type: "bool", default: "true", description: "owner からの JoinOffer を受け入れるか" },
+  { flag: "max_active_tasks", type: "u64", default: "1", description: "同時実行可能なタスクの最大数" },
+]} />
+
+```toml
+[worker]
+accept_join_offers = true
+max_active_tasks = 1
+```
+
+---
+
+## [observation]
+
+プランニングと評価の設定です。owner ロールがビジョンをタスクに分解する際に使用します。
+
+<ApiTable data={[
+  { flag: "planner", type: "string", default: "\"heuristic\"", description: "プランニング戦略。heuristic / openclaw / openclaw_worker" },
+  { flag: "evaluator", type: "string", default: "\"heuristic\"", description: "評価戦略。現在は heuristic のみ" },
+  { flag: "cache_snapshots", type: "bool", default: "true", description: "スナップショットをキャッシュ" },
+  { flag: "cache_ttl_sec", type: "u64", default: "30", description: "キャッシュの TTL (秒)" },
+  { flag: "max_planned_tasks", type: "usize", default: "6", description: "1 ビジョンから生成するタスクの最大数" },
+  { flag: "min_task_objective_chars", type: "usize", default: "48", description: "タスク目標テキストの最小文字数" },
+  { flag: "planner_bin", type: "string | null", default: "null", description: "プランナー用 OpenClaw バイナリ (openclaw/openclaw_worker 戦略時)" },
+  { flag: "planner_working_dir", type: "string | null", default: "null", description: "プランナーの作業ディレクトリ" },
+  { flag: "planner_timeout_sec", type: "u64", default: "120", description: "プランナーのタイムアウト (秒)" },
+  { flag: "planner_capability_version", type: "string", default: "\"openclaw.plan.v1\"", description: "プランナーの capability バージョン" },
+  { flag: "planner_fallback_to_heuristic", type: "bool", default: "true", description: "OpenClaw プランナー失敗時にヒューリスティックへフォールバック" },
+]} />
+
+```toml
+[observation]
+planner = "heuristic"
+evaluator = "heuristic"
+cache_snapshots = true
+cache_ttl_sec = 30
+max_planned_tasks = 6
+min_task_objective_chars = 48
+planner_timeout_sec = 120
+planner_capability_version = "openclaw.plan.v1"
+planner_fallback_to_heuristic = true
+```
+
+<Accordion title="planner 戦略の比較">
+
+| 戦略 | 実行場所 | 説明 |
+|---|---|---|
+| `heuristic` | ローカル (owner) | ビジョンテキストからルールベースでタスクを分解。LLM 不要 |
+| `openclaw` | ローカル (owner) | ローカルの OpenClaw サブプロセスでプランニング |
+| `openclaw_worker` | リモート (worker) | worker ノードにプランニングタスクを委任 |
+
+</Accordion>
+
+---
+
+## [logs]
+
+ランタイムログのローテーション設定です。
+
+<ApiTable data={[
+  { flag: "rotate_max_bytes", type: "u64", default: "1048576", description: "ログファイルの最大サイズ (bytes)。デフォルトは 1 MB" },
+  { flag: "max_archives", type: "usize", default: "5", description: "保持するアーカイブファイルの最大数" },
+]} />
+
+```toml
+[logs]
+rotate_max_bytes = 1048576
+max_archives = 5
+```
+
+---
+
+## [artifacts]
+
+タスク実行で生成されるアーティファクトの保存設定です。
+
+<ApiTable data={[
+  { flag: "dir", type: "string", default: "\"<data_dir>/artifacts\"", description: "アーティファクト保存ディレクトリ" },
+  { flag: "max_files", type: "usize", default: "256", description: "保持するアーティファクトファイルの最大数" },
+  { flag: "max_age_sec", type: "u64", default: "604800", description: "アーティファクトの最大保持期間 (秒)。デフォルトは 7 日" },
+]} />
+
+```toml
+[artifacts]
+dir = "~/.starweft/artifacts"
+max_files = 256
+max_age_sec = 604800
+```
+
+---
+
+## 設定ファイルの完全な例
+
+```toml
+[node]
+role = "worker"
+display_name = "worker-01"
+data_dir = "~/.starweft-worker"
+listen = ["/unix/~/.starweft-worker/mailbox.sock"]
+log_level = "info"
+
+[identity]
+actor_key_path = "~/.starweft-worker/identity/actor_key"
+
+[discovery]
+seeds = ["/unix/~/.starweft-owner/mailbox.sock"]
+auto_discovery = true
+mdns = false
+
+[p2p]
+transport = "local_mailbox"
+relay_enabled = true
+direct_preferred = true
+max_peers = 128
+
+[ledger]
+path = "~/.starweft-worker/ledger/node.db"
+
+[openclaw]
+enabled = true
+bin = "openclaw"
+timeout_sec = 3600
+capability_version = "openclaw.execution.v1"
+
+[compatibility]
+protocol_version = "starweft/0.1"
+bridge_capability_version = "openclaw.execution.v1"
+allow_legacy_protocols = false
+
+[owner]
+max_retry_attempts = 8
+retry_cooldown_ms = 250
+retry_strategy = "rule_based"
+
+[worker]
+accept_join_offers = true
+max_active_tasks = 1
+
+[observation]
+planner = "heuristic"
+evaluator = "heuristic"
+cache_snapshots = true
+cache_ttl_sec = 30
+
+[logs]
+rotate_max_bytes = 1048576
+max_archives = 5
+
+[artifacts]
+dir = "~/.starweft-worker/artifacts"
+max_files = 256
+max_age_sec = 604800
+```

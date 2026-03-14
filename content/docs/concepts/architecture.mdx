@@ -3,4 +3,242 @@ title: "Architecture"
 description: "Understand Starweft's peer-to-peer architecture and communication model."
 ---
 
-Content coming soon. This section will cover Starweft's peer-to-peer architecture, including how nodes communicate via Unix sockets and libp2p TCP, the absence of any central server, and the overall communication model that enables distributed task coordination.
+## システム概要
+
+Starweft は中央サーバーを持たない **完全 P2P アーキテクチャ** で動作します。すべてのノードはユーザーのローカルマシン上で CLI プロセスとして実行され、クラウドインフラやデータベースサーバーは一切不要です。
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                  ユーザーのローカルマシン                    │
+│                                                          │
+│  ┌─────────────┐     ┌─────────────┐                     │
+│  │  principal   │────▶│   owner     │                     │
+│  │  (CLI)       │     │   (CLI)     │                     │
+│  │              │     │             │                     │
+│  │ Ed25519 鍵   │     │ Ed25519 鍵  │                     │
+│  │ SQLite WAL   │     │ SQLite WAL  │                     │
+│  └──────────────┘     └──────┬──────┘                     │
+│                              │                            │
+│                    TaskDelegated                           │
+│                              │                            │
+│                     ┌────────▼────────┐                   │
+│                     │    worker       │                    │
+│                     │    (CLI)        │                    │
+│                     │                 │                    │
+│                     │ Ed25519 鍵      │                    │
+│                     │ SQLite WAL      │                    │
+│                     │ OpenClaw bridge │                    │
+│                     └─────────────────┘                    │
+│                                                          │
+│  通信: Unix ソケット (local_mailbox)                       │
+│  or    libp2p TCP (マルチマシン構成)                        │
+└──────────────────────────────────────────────────────────┘
+```
+
+各ノードは独立した CLI プロセスであり、それぞれが以下を保持します。
+
+- **Ed25519 鍵ペア** -- メッセージの署名と検証に使用
+- **SQLite WAL データベース** -- イベントソーシングによる状態永続化
+- **inbox/outbox パイプライン** -- メッセージの受信・送信キュー
+
+## トランスポート層
+
+Starweft は 2 種類のトランスポートバックエンドを提供します。
+
+### local_mailbox (ファイルベース)
+
+Unix 環境でのデフォルトトランスポートです。`/unix/` multiaddr パスをメールボックスとして使用し、ファイルの atomic rename でメッセージを受信します。
+
+```toml
+[node]
+listen = ["/unix//home/user/.starweft/mailbox.sock"]
+
+[p2p]
+transport = "local_mailbox"
+```
+
+- 単一マシン上の複数ノード間通信に最適
+- ファイルシステムの `rename` 操作でメッセージをアトミックに取得
+- クラッシュリカバリ: `.recv` 一時ファイルからの自動復旧
+
+### libp2p TCP
+
+マルチマシン構成やネットワーク越しの通信で使用します。Windows 環境ではデフォルトです。
+
+```toml
+[node]
+listen = ["/ip4/0.0.0.0/tcp/4001"]
+
+[p2p]
+transport = "libp2p"
+```
+
+- **Noise プロトコル** による暗号化通信
+- **Yamux** マルチプレクサによるストリーム多重化
+- **CBOR** エンコードの request-response プロトコル (`/starweft/0.1`)
+- **seed peer** の自動再接続 (5 秒間隔)
+- アイドルコネクションを 300 秒維持
+- inbox 容量上限: 10,000 メッセージ
+
+### mDNS によるピア自動発見
+
+libp2p トランスポート使用時、mDNS を有効にするとローカルネットワーク上のピアを自動検出できます。
+
+```toml
+[discovery]
+mdns = true
+```
+
+<Callout type="info">
+mDNS は同一 LAN 内のノード検出に有効です。異なるネットワーク間では `discovery.seeds` に seed peer を手動設定してください。
+</Callout>
+
+## イベントソーシングと SQLite WAL
+
+Starweft は **イベントソーシングパターン** を採用しています。すべてのプロトコルメッセージは `task_events` テーブルにイミュータブルなイベントとして記録され、プロジェクションテーブル (`projects`, `tasks`, `task_results` など) が現在の状態ビューを提供します。
+
+```
+┌──────────────────┐
+│  受信メッセージ    │
+│  (WireEnvelope)   │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐     ┌──────────────────┐
+│  task_events     │────▶│  projects        │
+│  (イベントログ)   │     │  tasks           │
+│  ────────────    │     │  task_results    │
+│  msg_id (PK)     │     │  artifacts       │
+│  msg_type        │     │  evaluation_certs│
+│  body_json       │     │  stop_orders     │
+│  signature_json  │     │  (プロジェクション)│
+│  lamport_ts      │     └──────────────────┘
+└──────────────────┘
+```
+
+主要なテーブル構成:
+
+| テーブル | 用途 |
+|---------|------|
+| `local_identity` | ノード自身のアクター ID・公開鍵・表示名 |
+| `peer_addresses` | 既知ピアの multiaddr アドレス |
+| `peer_keys` | ピアの公開鍵・ケイパビリティ |
+| `visions` | 投入されたビジョン |
+| `projects` | プロジェクト状態 (planning / active / stopping / stopped) |
+| `tasks` | タスク状態 (queued → running → completed/failed/stopped) |
+| `task_events` | すべてのメッセージのイミュータブルログ |
+| `task_results` | タスク実行結果のサマリー |
+| `inbox_messages` | 受信キュー (重複排除付き) |
+| `outbox_messages` | 送信キュー (リトライ・dead-letter 管理付き) |
+
+SQLite の **WAL (Write-Ahead Logging)** モードにより、読み書きの並行性と耐障害性を確保しています。
+
+## inbox/outbox パイプライン
+
+メッセージの送受信は `RuntimePipeline` を介した inbox/outbox パターンで管理されます。
+
+```
+受信フロー:
+  transport.receive()
+    → WireEnvelope を JSON デシリアライズ
+    → 署名検証 (Ed25519)
+    → 重複チェック (inbox_message_processed)
+    → route_incoming_wire() で MsgType に応じたハンドラへ
+    → プロジェクション更新
+    → mark_inbox_message_processed()
+
+送信フロー:
+  RuntimePipeline.queue_outgoing()
+    → outbox_messages に queued 状態で保存
+  flush_outbox()
+    → 配送先を peer_addresses から解決
+    → transport.deliver() で送信
+    → 成功: delivered 状態に更新
+    → 失敗: リトライ (250ms 間隔, 最大 20 回)
+    → 上限超過: dead_letter 状態に移行
+```
+
+<Callout type="tip">
+Relay ノードは受信メッセージをそのまま outbox に転送します。宛先 (`to_actor_id`) がある場合はそのアクターにのみ配送し、ブロードキャストの場合は送信元を除く全ピアに転送します。
+</Callout>
+
+## Ed25519 署名検証
+
+すべてのプロトコルメッセージは Ed25519 で署名されます。
+
+<Steps>
+### 署名対象の構築
+
+`UnsignedEnvelope` から `SignableEnvelope` 構造体を作成します。body を含むすべてのフィールドが署名対象です。
+
+### Canonical JSON シリアライズ
+
+`SignableEnvelope` を **canonical JSON** (キーのソート済み、空白なし) にシリアライズし、決定的なバイト列を生成します。
+
+### Ed25519 署名
+
+canonical JSON バイト列に対して Ed25519 秘密鍵で署名し、`MessageSignature` (アルゴリズム `"ed25519"` + key_id + Base64 署名) を生成します。
+
+### 検証
+
+受信側は送信者の公開鍵で同じ canonical JSON を再構築し、署名を検証します。ピアの公開鍵は `CapabilityQuery` / `CapabilityAdvertisement` メッセージで自己証明的に交換されます。
+</Steps>
+
+```rust
+// 署名の構造
+pub struct MessageSignature {
+    pub alg: String,       // "ed25519"
+    pub key_id: KeyId,     // 鍵の一意識別子
+    pub sig: String,       // Base64 エンコードされた署名
+}
+```
+
+<Callout type="warning">
+秘密鍵ファイルは **0600 パーミッション** (Unix) で保護されます。Windows では `icacls` で現在のユーザーのみにアクセスを制限します。
+</Callout>
+
+## クレート依存構造
+
+Starweft のコードベースは責務ごとに分離されたクレートで構成されています。
+
+<FileTree data={[
+  {
+    name: "apps/starweft",
+    type: "directory",
+    children: [
+      { name: "src — CLI 本体 (コマンド, ランタイム, TUI)", type: "directory" }
+    ]
+  },
+  {
+    name: "crates",
+    type: "directory",
+    children: [
+      { name: "starweft-protocol — メッセージ型, エンベロープ, 署名検証", type: "directory" },
+      { name: "starweft-store — SQLite 永続化, イベントソーシング", type: "directory" },
+      { name: "starweft-runtime — inbox/outbox パイプライン", type: "directory" },
+      { name: "starweft-p2p — local_mailbox + libp2p トランスポート", type: "directory" },
+      { name: "starweft-crypto — Ed25519 鍵管理, canonical JSON", type: "directory" },
+      { name: "starweft-id — ULID ベースの型付き ID", type: "directory" },
+      { name: "starweft-observation — タスク分解, 評価スコアリング", type: "directory" },
+      { name: "starweft-openclaw-bridge — OpenClaw サブプロセス実行", type: "directory" },
+      { name: "starweft-stop — 停止制御ロジック", type: "directory" }
+    ]
+  }
+]} />
+
+依存関係の方向:
+
+```
+starweft (CLI)
+├── starweft-protocol   ← starweft-crypto, starweft-id
+├── starweft-store      ← starweft-protocol, starweft-crypto, starweft-id, starweft-stop
+├── starweft-runtime    ← starweft-protocol, starweft-store
+├── starweft-p2p        ← (libp2p, multiaddr)
+├── starweft-observation ← starweft-protocol
+├── starweft-openclaw-bridge ← starweft-protocol
+└── starweft-stop       ← (独立)
+```
+
+<Callout type="info">
+`starweft-crypto` と `starweft-id` は最下層のユーティリティクレートであり、他のすべてのクレートから参照されます。`starweft-stop` は停止制御の状態遷移ロジックのみを提供し、外部依存が最小限です。
+</Callout>

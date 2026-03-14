@@ -3,4 +3,268 @@ title: "Roles"
 description: "The four node roles: principal, owner, worker, and relay."
 ---
 
-Content coming soon. This section will cover the four node roles in Starweft — principal, owner, worker, and relay — explaining each role's responsibilities and how they interact within the distributed coordination system.
+## ロール概要
+
+Starweft は **4 つのノードロール** で分散協調を実現します。各ロールは独立した CLI プロセスとして動作し、Ed25519 署名付きメッセージで通信します。
+
+| ロール | 責務 | 鍵の種類 |
+|--------|------|----------|
+| **principal** | ビジョン投入、停止命令の発行 | actor_key + stop_authority_key |
+| **owner** | タスク分解、worker への配布、結果評価 | actor_key |
+| **worker** | OpenClaw 経由のタスク実行、進捗報告 | actor_key |
+| **relay** | メッセージ転送 (鍵不要) | なし |
+
+```toml
+# config.toml でロールを指定
+[node]
+role = "owner"  # principal / owner / worker / relay
+```
+
+## Principal
+
+**Principal** はシステムの「意思決定者」です。人間のユーザーが操作するノードであり、プロジェクトの開始と停止に関する権限を持ちます。
+
+### 責務
+
+- **ビジョンの投入**: `starweft vision submit` コマンドで目標 (VisionIntent) を owner に送信
+- **停止命令の発行**: `starweft stop` コマンドでプロジェクトまたはタスクツリーの停止を指示
+- **承認の付与**: タスク実行前の承認ゲートで ApprovalGranted を送信
+
+### 停止権限
+
+Principal は **stop_authority_key** という専用の鍵ペアを保持します。StopOrder メッセージはこの鍵で署名され、受信側は stop_public_key で検証します。
+
+```toml
+[identity]
+actor_key_path = "~/.starweft/identity/actor_key"
+stop_authority_key_path = "~/.starweft/identity/stop_authority_key"
+```
+
+<Callout type="warning">
+`stop_authority_key` は principal ロールでのみ自動生成されます。この鍵による StopOrder は owner と worker の両方に即座に伝播し、実行中のタスクを中断します。
+</Callout>
+
+### ビジョン制約
+
+Principal はビジョン投入時に `VisionConstraints` を指定できます。
+
+```json
+{
+  "budget_mode": "minimal",
+  "allow_external_agents": false,
+  "human_intervention": "required"
+}
+```
+
+- **`budget_mode`**: `"minimal"` ではタスク分解数が制限される
+- **`allow_external_agents`**: 外部エージェントの参加を許可するか
+- **`human_intervention`**: `"required"` ではタスク実行前に承認が必要
+
+## Owner
+
+**Owner** はプロジェクトのオーケストレーターです。Principal から受け取ったビジョンをタスクに分解し、Worker に配布して実行を監督します。
+
+### 責務
+
+- **ProjectCharter の生成**: ビジョンからプロジェクトを起案し、評価ポリシーを設定
+- **タスク分解 (Planning)**: ビジョンを実行可能なタスクに分割
+- **JoinOffer の送信**: Worker に参加オファーを送り、ケイパビリティを確認
+- **TaskDelegated の送信**: タスクを Worker に委任
+- **結果評価**: TaskResultSubmitted を受け取り、多次元スコアで EvaluationIssued を発行
+- **リトライ制御**: 失敗したタスクのリトライ判定と再委任
+- **StopOrder の中継**: Principal からの停止命令を Worker に転送
+
+### プランニング戦略
+
+Owner は 3 つのプランニング戦略をサポートします。
+
+<Tabs items="heuristic,openclaw,openclaw_worker">
+<div>
+**heuristic** (デフォルト): ビジョンテキストをルールベースで分割します。LLM 呼び出しなしで高速に動作します。
+
+```toml
+[observation]
+planner = "heuristic"
+max_planned_tasks = 6
+min_task_objective_chars = 48
+```
+</div>
+<div>
+**openclaw**: Owner ノード上で OpenClaw バイナリを直接起動し、LLM にタスク分解を委ねます。失敗時は heuristic にフォールバック可能です。
+
+```toml
+[observation]
+planner = "openclaw"
+planner_bin = "openclaw"
+planner_timeout_sec = 120
+planner_fallback_to_heuristic = true
+```
+</div>
+<div>
+**openclaw_worker**: タスク分解自体を Worker に委任します。Worker が OpenClaw を実行してタスクプランを生成し、Owner がそれを子タスクとして展開します。
+
+```toml
+[observation]
+planner = "openclaw_worker"
+planner_capability_version = "openclaw.plan.v1"
+```
+</div>
+</Tabs>
+
+### 評価ポリシー
+
+Owner はタスク結果を 4 次元で評価します。
+
+```rust
+pub struct EvaluationPolicy {
+    pub quality_weight: f32,     // 品質
+    pub speed_weight: f32,       // 速度
+    pub reliability_weight: f32, // 信頼性
+    pub alignment_weight: f32,   // 目標との整合性
+}
+```
+
+### リトライ戦略
+
+失敗したタスクに対して、ルールベースのリトライ判定を行います。
+
+<ApiTable data={[
+  { name: "timeout / timed out", description: "同一 Worker でリトライ (一時的なタイムアウト)" },
+  { name: "process failed / worker overloaded / worker unavailable", description: "別の Worker でリトライ (一時的な実行障害)" },
+  { name: "capability mismatch / invalid input / schema / unauthorized", description: "リトライしない (恒久的な失敗)" }
+]} />
+
+```toml
+[owner]
+max_retry_attempts = 8
+retry_cooldown_ms = 250
+retry_strategy = "rule_based"
+```
+
+## Worker
+
+**Worker** はタスクの実行者です。OpenClaw バイナリをサブプロセスとして起動し、実際の作業を行います。
+
+### 責務
+
+- **JoinOffer への応答**: ケイパビリティを確認し、JoinAccept または JoinReject を返信
+- **タスク実行**: OpenClaw bridge を介してタスクを実行
+- **進捗報告**: `PROGRESS:<float>:<message>` 形式で TaskProgress を送信
+- **結果送信**: 実行結果を TaskResultSubmitted として Owner に返却
+- **停止処理**: StopOrder 受信時に実行中タスクをキャンセルし、StopAck / StopComplete を送信
+
+### OpenClaw bridge
+
+Worker は OpenClaw バイナリを子プロセスとして起動します。
+
+```
+Worker プロセス
+  │
+  │  stdin: BridgeTaskRequest (JSON)
+  ▼
+┌─────────────────────┐
+│  OpenClaw バイナリ     │
+│  (サブプロセス)        │
+│                     │
+│  stdout: PROGRESS:0.5:working...
+│  stdout: BridgeTaskResponse (JSON)
+│  stderr: ログ出力
+└─────────────────────┘
+```
+
+```toml
+[openclaw]
+enabled = true
+bin = "openclaw"
+timeout_sec = 3600
+capability_version = "openclaw.execution.v1"
+```
+
+### 同時実行制御
+
+Worker は同時に実行するタスク数を制限できます。
+
+```toml
+[worker]
+accept_join_offers = true
+max_active_tasks = 1
+```
+
+<Callout type="info">
+`accept_join_offers = false` に設定すると、Worker は新しい JoinOffer を自動的に拒否します。メンテナンス時などに有用です。
+</Callout>
+
+### タスクキャンセル
+
+StopOrder 受信時、Worker は以下の手順でタスクを安全に停止します。
+
+<Steps>
+### cancel_flag を設定
+
+実行中タスクの `AtomicBool` キャンセルフラグを `true` に設定します。
+
+### OpenClaw プロセスの停止待機
+
+サブプロセスがキャンセルフラグを検知して終了するのを待ちます。
+
+### StopAck を送信
+
+停止処理を開始したことを Owner に通知します。
+
+### StopComplete を送信
+
+すべての関連タスクが停止した時点で完了を通知します。
+</Steps>
+
+## Relay
+
+**Relay** はメッセージの転送ノードです。直接通信できないノード間の橋渡しを行います。
+
+### 責務
+
+- 受信したメッセージをそのまま outbox にキューイングし、他のピアに転送
+- **署名の検証・改変は行わない**: メッセージはオリジナルの署名のまま転送
+- 宛先 (`to_actor_id`) がある場合はそのアクターにのみ転送
+- ブロードキャストメッセージは送信元を除く全ピアに転送
+
+### 設定
+
+Relay ノードは Ed25519 鍵を必要としません。
+
+```toml
+[node]
+role = "relay"
+
+[p2p]
+relay_enabled = true
+direct_preferred = true   # 直接接続を優先
+```
+
+<Callout type="tip">
+`direct_preferred = true` (デフォルト) では、配送先の解決時に直接アドレスが relay アドレスより優先されます。relay 経由のルーティングを優先する場合は `false` に設定してください。
+</Callout>
+
+## ロール間の通信フロー
+
+```
+Principal                Owner                   Worker
+    │                      │                       │
+    │──VisionIntent───────▶│                       │
+    │                      │──CapabilityQuery─────▶│
+    │                      │◀─CapabilityAdvert.───│
+    │                      │──JoinOffer───────────▶│
+    │                      │◀─JoinAccept──────────│
+    │◀─ProjectCharter──────│                       │
+    │                      │──TaskDelegated───────▶│
+    │                      │◀─TaskProgress────────│
+    │                      │◀─TaskResultSubmitted──│
+    │                      │──EvaluationIssued────▶│
+    │                      │                       │
+    │──StopOrder──────────▶│──StopOrder───────────▶│
+    │                      │◀─StopAck─────────────│
+    │◀─StopAck─────────────│                       │
+    │                      │◀─StopComplete────────│
+    │◀─StopComplete────────│                       │
+```
+
+各ロールの設定方法の詳細は [設定リファレンス](/docs/reference/config) を参照してください。

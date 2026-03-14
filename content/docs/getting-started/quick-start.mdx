@@ -67,17 +67,23 @@ Note the `actor_id`, `node_id`, and `public_key` values — you'll need them for
 
 ## Register Peers
 
-Each node needs to know about its peers. Using the local mailbox transport:
+各ノードは相互に通信先を知る必要があります。
+
+<Tabs items="手動登録 (local_mailbox),mDNS 自動発見 (libp2p)">
+
+<div>
+
+local_mailbox transport（Unix デフォルト）の場合、`peer add` で手動登録します:
 
 ```bash
-# Register the owner as a peer of the principal
+# principal に owner を登録
 starweft peer add /unix/$(pwd)/demo/owner/mailbox.sock \
   --data-dir ./demo/principal \
   --actor-id <OWNER_ACTOR_ID> \
   --node-id <OWNER_NODE_ID> \
   --public-key <OWNER_PUBLIC_KEY>
 
-# Register the worker as a peer of the owner
+# owner に worker を登録
 starweft peer add /unix/$(pwd)/demo/worker/mailbox.sock \
   --data-dir ./demo/owner \
   --actor-id <WORKER_ACTOR_ID> \
@@ -86,8 +92,35 @@ starweft peer add /unix/$(pwd)/demo/worker/mailbox.sock \
 ```
 
 <Callout type="tip">
-  Replace the `<...>` placeholders with the actual values from `identity show`.
+  `<...>` は `identity show` の出力で置き換えてください。
 </Callout>
+
+</div>
+
+<div>
+
+libp2p transport + mDNS（v0.3.0）を使うと、同一 LAN 上のノードは自動発見されます。
+`peer add` は不要です。
+
+各ノードの `config.toml` で libp2p を有効化します:
+
+```toml
+[p2p]
+transport = "libp2p"
+
+[discovery]
+mdns = true
+```
+
+ノードを起動するだけで、mDNS 経由で自動的にピアを発見し、CapabilityQuery/CapabilityAdvertisement を交換します。
+
+<Callout type="warning">
+  mDNS は LAN 内のアドレス発見のみです。メッセージの署名検証（Ed25519）は引き続き有効なため、不正なノードからのメッセージは拒否されます。
+</Callout>
+
+</div>
+
+</Tabs>
 
 ## Start the Nodes
 

@@ -3,4 +3,250 @@ title: "Audit"
 description: "Verify event store integrity with signature and tamper detection."
 ---
 
-Content coming soon. This section will cover how to verify event store integrity using the audit command, including signature verification, raw JSON tamper detection, and interpreting audit results.
+## 概要
+
+Starweft のすべてのプロトコルメッセージは **イベントソーシング**方式で SQLite データベースに記録されます。`audit verify-log` コマンドは、このイベントログの**完全性**と**署名の正当性**を検証し、改ざんや破損を検出します。
+
+## audit verify-log
+
+### 実行方法
+
+```bash
+starweft audit verify-log
+```
+
+<Callout type="info">
+`--data-dir` オプションでデータディレクトリを指定できます。省略時はデフォルト（Unix: `~/.starweft`、Windows: `%LOCALAPPDATA%\starweft`）が使用されます。
+</Callout>
+
+### 検査項目
+
+`audit verify-log` は以下の項目を検査します。
+
+<ApiTable data={[
+  { name: "raw JSON 整合性", description: "保存された生 JSON (raw_json) とデータベースカラムに分解された値が一致するか検証。改ざんの直接的な検出手段。" },
+  { name: "Ed25519 署名検証", description: "生 JSON に対して送信者の公開鍵で Ed25519 署名を再検証。鍵が不明な場合は unverifiable として報告。" },
+  { name: "task_id の存在", description: "TaskDelegated / TaskProgress / TaskResultSubmitted イベントに task_id が設定されているか確認。" },
+  { name: "ProjectCharter 重複", description: "同一 project_id に対する ProjectCharter が複数存在しないか確認。" },
+  { name: "Lamport タイムスタンプ", description: "同一プロジェクト内で Lamport タイムスタンプが単調増加しているか確認。回帰はイベント順序の不整合を示す。" },
+  { name: "JSON パース", description: "イベントの構造体デシリアライズが正常に完了するか確認。" }
+]} />
+
+### 出力の読み方
+
+<Terminal title="正常時の出力例">
+```
+checked_events: 42
+invalid_events: 0
+signature_failures: 0
+raw_json_mismatches: 0
+unverifiable_signatures: 0
+audit: ok
+```
+</Terminal>
+
+<Terminal title="異常検出時の出力例">
+```
+checked_events: 42
+invalid_events: 2
+signature_failures: 1
+raw_json_mismatches: 1
+unverifiable_signatures: 3
+error: msg_01ABC...: signature verification failed
+error: msg_01DEF...: raw_json mismatch for field lamport_ts
+[E_AUDIT_FAILED] task_events に不整合があります
+```
+</Terminal>
+
+### 出力フィールドの意味
+
+| フィールド | 意味 |
+|---|---|
+| `checked_events` | 検査したイベントの総数 |
+| `invalid_events` | 問題が検出されたイベント数（署名失敗 + raw JSON 不一致 + 構造不正 + 重複 + Lamport 回帰 + task_id 欠落の合計） |
+| `signature_failures` | Ed25519 署名の検証に失敗したイベント数 |
+| `raw_json_mismatches` | 生 JSON とカラム値が不一致のイベント数 |
+| `unverifiable_signatures` | 公開鍵が不明または `raw_json` が未保存で署名検証をスキップしたイベント数 |
+
+<Callout type="warning">
+`unverifiable_signatures` が 0 でない場合、対象イベントの署名は検証されていません。これは必ずしも改ざんを意味しませんが、`peer add` で該当ピアの公開鍵を登録すれば検証可能になります。
+</Callout>
+
+## 問題が検出された場合の対処
+
+### signature_failures / raw_json_mismatches が検出された場合
+
+イベントデータが改ざんされた可能性があります。
+
+1. **バックアップからの復元**を検討してください（後述の `backup restore`）
+2. プロジェクション（集計テーブル）のみが破損している場合は、`repair rebuild-projections` で修復できる可能性があります
+
+### unverifiable_signatures が多い場合
+
+ピアの公開鍵がローカルに登録されていない可能性があります。
+
+```bash
+# ピアの公開鍵を登録
+starweft peer add /ip4/192.168.1.10/tcp/9000 \
+  --public-key "<base64 public key>"
+
+# 再度監査を実行
+starweft audit verify-log
+```
+
+## repair rebuild-projections
+
+`repair rebuild-projections` はイベントログ（`task_events` テーブル）から**プロジェクションテーブルを再構築**するコマンドです。
+
+```bash
+starweft repair rebuild-projections
+```
+
+<Terminal title="出力例">
+```
+replayed_events: 42
+rebuilt_projects: 3
+rebuilt_tasks: 15
+rebuilt_publish_events: 2
+rebuilt_snapshots: 3
+```
+</Terminal>
+
+### rebuild-projections が修復できるもの
+
+- `projects` テーブル（プロジェクト状態の集計）
+- `tasks` テーブル（タスク状態の集計）
+- `task_results` / `evaluations` / `publish_events` テーブル
+- `snapshots` テーブル
+- `stop_orders` / `stop_receipts` テーブル
+- `approval_state` テーブル
+
+<Callout type="warning">
+`rebuild-projections` はイベントログ自体を修復するものではありません。イベントログが改ざん・破損している場合は、バックアップからの復元が必要です。
+</Callout>
+
+## backup create / backup restore
+
+### バックアップの作成
+
+```bash
+starweft backup create --output ~/starweft-backup
+```
+
+バックアップは指定ディレクトリにファイル一式をコピーし、**署名付き `manifest.json`** を生成します。
+
+<Accordion title="バックアップに含まれるファイル">
+
+| パス | 内容 |
+|---|---|
+| `config.toml` | ノード設定 |
+| `identity/actor_key` | メイン identity 鍵 |
+| `identity/stop_authority_key` | 停止権限鍵（存在する場合） |
+| `ledger/node.db` | SQLite データベース（`VACUUM INTO` によるクリーンコピー） |
+| `artifacts/` | タスク成果物 |
+| `logs/` | ログファイル |
+| `cache/` | キャッシュ |
+
+</Accordion>
+
+### バックアップの信頼アンカー
+
+バックアップの `manifest.json` には以下の保護メカニズムが組み込まれています。
+
+<Steps>
+
+### Ed25519 署名
+
+マニフェストの `payload` フィールド全体が `actor_key` で署名されます。これにより、マニフェスト自体の改ざんを検出します。
+
+### ファイルセット整合性検証
+
+マニフェストには含まれる全ファイルの **SHA-256 チェックサム**とサイズが記録されます。リストア時にすべてのファイルのチェックサムが照合されます。
+
+```json
+{
+  "files": [
+    { "path": "config.toml", "sha256": "a1b2c3...", "size_bytes": 1024 },
+    { "path": "identity/actor_key", "sha256": "d4e5f6...", "size_bytes": 256 }
+  ]
+}
+```
+
+### 署名者の信頼アンカー
+
+マニフェストの `signer_public_key` フィールドとバンドル内の `identity/actor_key` ファイルの公開鍵が一致することを検証します。攻撃者がマニフェストと `signer_public_key` を差し替えても、バンドル内の `actor_key` との不一致で検出されます。`actor_key` 自体のチェックサムもマニフェストに含まれるため、循環的に保護されています。
+
+### 余剰ファイルの検出
+
+マニフェストに記載されていないファイルがバンドル内に存在する場合、リストアは拒否されます。これにより、攻撃者によるファイル注入を防ぎます。
+
+</Steps>
+
+### バックアップの復元
+
+```bash
+starweft backup restore --input ~/starweft-backup
+```
+
+リストア時には以下の検証が自動的に行われます。
+
+1. `manifest.json` の存在とフォーマットバージョン (`starweft-local-backup/v1`) の確認
+2. マニフェスト署名の Ed25519 検証
+3. `signer_public_key` とバンドル内 `actor_key` の一致確認
+4. 全ファイルの SHA-256 チェックサムとサイズの照合
+5. マニフェスト外ファイルが存在しないことの確認
+6. リストア先に既存 identity がある場合、署名者との一致確認
+
+<Callout type="warning">
+リストア先に異なる identity が存在する場合、デフォルトでエラーになります。別ノードのバックアップを強制的に復元するには `--force` を使用してください。
+</Callout>
+
+```bash
+# 別ノードのバックアップを強制復元
+starweft backup restore --input ~/starweft-backup --force
+```
+
+### 既存データの上書き
+
+`--force` フラグなしの場合、リストア先に既存ファイルがあるとエラーになります。`--force` を指定すると既存データを上書きします。
+
+## 推奨ワークフロー
+
+定期的な監査とバックアップで、データの整合性を維持できます。
+
+<Steps>
+
+### 定期的な監査
+
+```bash
+starweft audit verify-log
+```
+
+異常がないことを確認します。
+
+### バックアップの作成
+
+```bash
+starweft backup create --output ~/starweft-backup-$(date +%Y%m%d)
+```
+
+### 問題発生時の修復
+
+プロジェクションが破損した場合はまず `rebuild-projections` を試みます。
+
+```bash
+starweft repair rebuild-projections
+```
+
+イベントログ自体に問題がある場合は、バックアップから復元します。
+
+```bash
+starweft backup restore --input ~/starweft-backup-20260315 --force
+```
+
+</Steps>
+
+## 関連ページ
+
+<LinkCard href="/docs/security/signing" title="メッセージ署名" description="Ed25519 署名と Canonical JSON による完全性保証" />
+<LinkCard href="/docs/security/key-management" title="鍵管理" description="Ed25519 鍵の生成、保管、交換方法" />

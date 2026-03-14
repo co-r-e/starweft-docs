@@ -3,4 +3,316 @@ title: "OpenClaw Integration"
 description: "Configure and customize the OpenClaw bridge for task execution."
 ---
 
-Content coming soon. This section will cover how to configure and customize the OpenClaw bridge, including subprocess management, JSON request/response formats, progress reporting, timeout control, and planning strategies.
+このガイドでは、Worker ノードに OpenClaw を接続してタスクを自動実行する方法を説明します。
+
+## OpenClaw とは
+
+[OpenClaw](https://github.com/openclaw) は自律 AI エージェント実行フレームワークです。Starweft は OpenClaw バイナリを**サブプロセスとして起動**し、JSON でタスクの入出力をやりとりします。
+
+```
+Worker ノード
+├── starweft run (メインプロセス)
+│   ├── stdin → BridgeTaskRequest (JSON)
+│   └── stdout ← BridgeTaskResponse (JSON)
+└── openclaw (サブプロセス)
+```
+
+<Callout type="info">
+  OpenClaw は Starweft の必須依存ではありません。Worker ノードに OpenClaw を接続しない場合、タスクの受付は行われますが実行はできません。
+</Callout>
+
+## OpenClaw の接続
+
+### `openclaw attach` コマンド
+
+```bash
+starweft openclaw attach \
+  --data-dir ~/.starweft-worker \
+  --bin /usr/local/bin/openclaw \
+  --enable
+```
+
+主要なオプション:
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--bin` | OpenClaw バイナリのパス | `openclaw` |
+| `--working-dir` | サブプロセスの作業ディレクトリ | なし |
+| `--timeout-sec` | 実行タイムアウト（秒） | `3600` |
+| `--enable` | 接続と同時に有効化 | — |
+
+このコマンドは `config.toml` の `[openclaw]` セクションを更新します。
+
+### 設定ファイルで直接指定する
+
+```toml
+[openclaw]
+enabled = true
+bin = "/usr/local/bin/openclaw"
+working_dir = "/home/user/workspace"
+timeout_sec = 3600
+capability_version = "openclaw.execution.v1"
+```
+
+<Callout type="warning">
+  `capability_version` は `[compatibility]` セクションの `bridge_capability_version` と一致させてください。不一致の場合、ノード起動時にエラーになります。
+</Callout>
+
+## BridgeTaskRequest
+
+Worker が OpenClaw サブプロセスの **stdin** に送信する JSON 形式のタスクリクエストです。
+
+```json
+{
+  "title": "GET /health エンドポイントの実装",
+  "description": "Axum を使って /health エンドポイントを実装する",
+  "objective": "GET /health に対して 200 OK と JSON ボディを返すエンドポイント",
+  "required_capability": "openclaw.execution.v1",
+  "input_payload": {
+    "language": "rust",
+    "framework": "axum",
+    "constraints": {}
+  }
+}
+```
+
+<ApiTable data={[
+  { field: "title", type: "string", description: "タスクの短いタイトル" },
+  { field: "description", type: "string", description: "タスクの詳細な説明" },
+  { field: "objective", type: "string", description: "タスクが達成すべき目的" },
+  { field: "required_capability", type: "string", description: "必要な capability 識別子" },
+  { field: "input_payload", type: "object", description: "タスク固有の入力データ" }
+]} />
+
+## BridgeTaskResponse
+
+OpenClaw サブプロセスが **stdout** に出力する JSON 形式のレスポンスです。
+
+```json
+{
+  "summary": "GET /health エンドポイントを実装しました",
+  "output_payload": {
+    "files_created": ["src/routes/health.rs"],
+    "tests_passed": true
+  },
+  "artifact_refs": [
+    {
+      "name": "health.rs",
+      "path": "src/routes/health.rs",
+      "content_type": "text/x-rust"
+    }
+  ]
+}
+```
+
+<ApiTable data={[
+  { field: "summary", type: "string", description: "実行結果の要約" },
+  { field: "output_payload", type: "object", description: "構造化された出力データ" },
+  { field: "artifact_refs", type: "array", description: "生成されたアーティファクトへの参照（オプション）" }
+]} />
+
+### レスポンスの柔軟なパース
+
+Starweft は stdout の内容を以下の優先順位でパースします。
+
+1. **完全な `BridgeTaskResponse` JSON** — すべてのフィールドを使用
+2. **任意の JSON オブジェクト** — `output_payload` として扱い、`summary` にはタスクタイトルを使用
+3. **プレーンテキスト** — `summary` として扱い、`output_payload` に `{"stdout": "..."}` を設定
+
+この柔軟性により、既存のスクリプトやツールを簡単に OpenClaw 互換にできます。
+
+## 進捗レポート
+
+サブプロセスは stdout に `PROGRESS:` プレフィックス付きの行を出力することで、実行中の進捗を報告できます。
+
+### フォーマット
+
+```
+PROGRESS:<progress_float>:<message>
+```
+
+- **`progress_float`** — 0.0〜1.0 の進捗率
+- **`message`** — 進捗の説明テキスト
+
+### 例
+
+```
+PROGRESS:0.1:環境のセットアップ中
+PROGRESS:0.3:依存関係のインストール中
+PROGRESS:0.7:テスト実行中
+PROGRESS:1.0:完了
+{"summary":"タスク完了","output_payload":{"ok":true}}
+```
+
+`PROGRESS:` 行は最終レスポンスの `progress_updates` 配列に収集されます。最終的な JSON レスポンスは `PROGRESS:` 行以外の stdout から抽出されます。
+
+## タイムアウトとキャンセル
+
+### タイムアウト
+
+サブプロセスが `timeout_sec` で設定された時間を超過すると、強制終了されます。
+
+```toml
+[openclaw]
+timeout_sec = 1800  # 30 分
+```
+
+タイムアウト時の動作:
+1. プロセスグループ全体に SIGKILL（Unix）または TerminateProcess（Windows）を送信
+2. エラーメッセージ `openclaw process timed out after N seconds` を返す
+3. Owner ノードのリトライポリシーに基づいて再試行を判断
+
+### キャンセル
+
+`stop` コマンドによるタスクの停止要求が発行されると、実行中のサブプロセスは即座に終了されます。
+
+- Worker は実行中の各タスクに対してアトミックなキャンセルフラグを保持
+- `StopOrder` を受信すると、対象タスクのキャンセルフラグを `true` に設定
+- 100ms 間隔のポーリングでフラグを検出し、プロセスを強制終了
+- エラーメッセージ `[E_TASK_CANCELLED] openclaw process cancelled` を返す
+
+### プロセスグループの隔離
+
+OpenClaw サブプロセスは独立したプロセスグループ（Unix）またはジョブオブジェクト（Windows）で起動されます。これにより、タイムアウトやキャンセル時にサブプロセスが生成した子プロセスも確実に終了されます。
+
+## プランニング戦略
+
+Starweft はビジョンをタスクに分解する際に、3 つのプランニング戦略をサポートします。
+
+### heuristic（デフォルト）
+
+ローカルのヒューリスティックアルゴリズムでタスクを分解します。OpenClaw は不要です。
+
+```toml
+[observation]
+planner = "heuristic"
+max_planned_tasks = 6
+min_task_objective_chars = 48
+```
+
+- ビジョンテキストを解析し、構造を推定
+- LLM API のコスト不要
+- 複雑なビジョンでは分解精度に限界あり
+
+### openclaw
+
+ローカルの OpenClaw バイナリをプランナーとして使用します。Owner ノードで実行されます。
+
+```toml
+[observation]
+planner = "openclaw"
+planner_bin = "/usr/local/bin/openclaw"
+planner_working_dir = "/home/user/workspace"
+planner_timeout_sec = 120
+planner_fallback_to_heuristic = true
+```
+
+- Owner ノード上で OpenClaw を直接起動
+- `planner_fallback_to_heuristic = true` で失敗時にヒューリスティックへフォールバック
+- `planner_bin` を指定しない場合は `[openclaw]` セクションの `bin` を使用
+
+### openclaw_worker
+
+プランニング自体を Worker タスクとして分散実行します。
+
+```toml
+[observation]
+planner = "openclaw_worker"
+planner_capability_version = "openclaw.plan.v1"
+```
+
+- プランニングが独立したタスクとして Worker に委任される
+- Worker は `openclaw.plan.v1` capability を持つ必要がある
+- `vision plan` のプレビューには最終的なタスク一覧ではなく、プランナータスク自体が表示される
+
+<Callout type="info">
+  `openclaw_worker` 戦略を使用する場合、`vision plan` プレビューの `planning_risk` は自動的に高めに評価されます。最終的なタスク分解は Worker の実行結果に依存するためです。
+</Callout>
+
+## テスト用モックスクリプト
+
+OpenClaw バイナリがなくても、シェルスクリプトで動作をテストできます。
+
+### 基本的なモックスクリプト
+
+```bash
+#!/bin/sh
+# mock-openclaw.sh
+# stdin から JSON リクエストを読み取り、固定レスポンスを返す
+
+# リクエストを読み取る（必須）
+REQUEST=$(cat)
+
+# 進捗を報告
+echo "PROGRESS:0.5:処理中"
+
+# レスポンスを返す
+cat <<'EOF'
+{
+  "summary": "モックタスク完了",
+  "output_payload": {
+    "mock": true,
+    "request_received": true
+  }
+}
+EOF
+```
+
+```bash
+chmod +x mock-openclaw.sh
+```
+
+### モックスクリプトの接続
+
+```bash
+starweft openclaw attach \
+  --data-dir ~/.starweft-worker \
+  --bin $(pwd)/mock-openclaw.sh \
+  --enable
+```
+
+### 進捗レポート付きモック
+
+```bash
+#!/bin/sh
+# mock-openclaw-progress.sh
+REQUEST=$(cat)
+
+echo "PROGRESS:0.1:開始"
+sleep 1
+echo "PROGRESS:0.5:処理中"
+sleep 1
+echo "PROGRESS:0.9:仕上げ中"
+
+printf '{"summary":"完了","output_payload":{"steps":3}}'
+```
+
+### エラーをシミュレートするモック
+
+```bash
+#!/bin/sh
+# mock-openclaw-error.sh
+REQUEST=$(cat)
+
+echo "処理に失敗しました" >&2
+exit 1
+```
+
+非ゼロの終了コードは `openclaw process failed` エラーとして Starweft に報告されます。Owner ノードのリトライポリシーに基づき、同じ Worker または別の Worker での再実行が試行されます。
+
+## 評価戦略
+
+タスク完了時の評価は `[observation]` セクションの `evaluator` で制御されます。
+
+```toml
+[observation]
+evaluator = "heuristic"
+```
+
+現在は `heuristic` のみがサポートされています。ヒューリスティック評価は、タスクの成否・リトライ回数・エラー内容を基にスコアリングを行います。
+
+## 次のステップ
+
+<LinkCard href="/docs/guides/first-vision" title="最初のビジョン" description="ビジョン投入から結果確認までの一連の流れ" />
+<LinkCard href="/docs/guides/config" title="設定ガイド" description="OpenClaw 関連設定の詳細" />
+<LinkCard href="/docs/concepts/task-lifecycle" title="タスクライフサイクル" description="タスクの委任・実行・評価の流れ" />

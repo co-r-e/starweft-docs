@@ -3,4 +3,342 @@ title: "Multi-Machine Setup"
 description: "Configure Starweft nodes across multiple machines using libp2p."
 ---
 
-Content coming soon. This section will cover how to configure Starweft nodes across multiple machines using libp2p TCP transport, including peer discovery, relay setup, and network topology considerations.
+このガイドでは、複数のマシンにまたがる Starweft ノードを libp2p TCP トランスポートで接続する方法を説明します。
+
+## トランスポートの概要
+
+Starweft は 2 種類のトランスポートを提供します。
+
+| トランスポート | 用途 | アドレス形式 |
+|---------------|------|-------------|
+| `local_mailbox` | 単一マシン（デフォルト / Unix） | `/unix/<path>/mailbox.sock` |
+| `libp2p` | マルチマシン（デフォルト / Windows） | `/ip4/<addr>/tcp/<port>` |
+
+<Callout type="info">
+  Unix 環境のデフォルトは `local_mailbox` です。マルチマシン構成では `libp2p` に切り替える必要があります。
+</Callout>
+
+## libp2p トランスポートへの切り替え
+
+### 初期化時に指定する
+
+```bash
+starweft init --role owner \
+  --data-dir ~/.starweft-owner \
+  --listen /ip4/0.0.0.0/tcp/9100
+```
+
+`/ip4/0.0.0.0` を指定すると、すべてのネットワークインターフェースでリッスンします。
+
+### 既存の設定を変更する
+
+`config.toml` の `[p2p]` セクションと `[node]` セクションを編集します。
+
+```toml
+[node]
+role = "owner"
+listen = ["/ip4/0.0.0.0/tcp/9100"]
+
+[p2p]
+transport = "libp2p"
+relay_enabled = true
+direct_preferred = true
+max_peers = 128
+```
+
+<Callout type="warning">
+  `transport` を `libp2p` に変更した場合、`listen` アドレスも `/ip4/.../tcp/...` 形式に変更してください。libp2p トランスポートは `/unix` アドレスをサポートしていません。
+</Callout>
+
+## ネットワーク構成
+
+### ポート設計の例
+
+| ノード | 役割 | リッスンアドレス |
+|--------|------|-----------------|
+| Machine A | principal | `/ip4/0.0.0.0/tcp/9000` |
+| Machine B | owner | `/ip4/0.0.0.0/tcp/9100` |
+| Machine C | worker | `/ip4/0.0.0.0/tcp/9200` |
+| Machine D | relay | `/ip4/0.0.0.0/tcp/9300` |
+
+### ファイアウォール設定
+
+各マシンで使用するポートを開放してください。Starweft は TCP のみを使用します（UDP/QUIC は現在未対応）。
+
+```bash
+# 例: ufw の場合
+sudo ufw allow 9100/tcp
+```
+
+## 手動ピア登録
+
+libp2p トランスポートでは、マルチアドレスに `/p2p/<peer-id>` を含める必要があります。
+
+<Steps>
+
+<div>
+
+**各ノードの Peer ID を確認する**
+
+libp2p トランスポートを使用する場合、ノード起動時に Peer ID が表示されます。`identity show` でも確認できます。
+
+```bash
+starweft identity show --data-dir ~/.starweft-owner
+```
+
+</div>
+
+<div>
+
+**ピアを登録する**
+
+```bash
+# principal に owner を登録
+starweft peer add /ip4/192.168.1.20/tcp/9100/p2p/<OWNER_PEER_ID> \
+  --data-dir ~/.starweft-principal \
+  --actor-id <OWNER_ACTOR_ID> \
+  --node-id <OWNER_NODE_ID> \
+  --public-key <OWNER_PUBLIC_KEY>
+
+# owner に worker を登録
+starweft peer add /ip4/192.168.1.30/tcp/9200/p2p/<WORKER_PEER_ID> \
+  --data-dir ~/.starweft-owner \
+  --actor-id <WORKER_ACTOR_ID> \
+  --node-id <WORKER_NODE_ID> \
+  --public-key <WORKER_PUBLIC_KEY>
+```
+
+</div>
+
+<div>
+
+**登録内容を確認する**
+
+```bash
+starweft peer list --data-dir ~/.starweft-principal
+```
+
+</div>
+
+</Steps>
+
+<Callout type="tip">
+  `peer add` はマルチアドレスを自動的に `discovery.seeds` にも追加します。ノード起動時に自動で再接続が試行されます。
+</Callout>
+
+## mDNS 自動検出 (v0.3.0)
+
+<Badge>v0.3.0</Badge>
+
+v0.3.0 から、同一 LAN 内のノードを **mDNS（Multicast DNS）** で自動検出できるようになりました。手動のピア登録を省略でき、ノードの追加・削除に柔軟に対応できます。
+
+### mDNS を有効にする
+
+`config.toml` の `[discovery]` セクションで設定します。
+
+```toml
+[p2p]
+transport = "libp2p"
+
+[discovery]
+mdns = true
+```
+
+<Callout type="info">
+  mDNS は `libp2p` トランスポートでのみ動作します。`local_mailbox` トランスポートでは無効です。
+</Callout>
+
+### 動作の仕組み
+
+mDNS が有効なノードが起動すると、以下のプロセスが自動で実行されます。
+
+1. **ピア検出** — mDNS マルチキャストにより、同一ネットワーク上の Starweft ノードを自動検出
+2. **アドレス登録** — 検出されたピアのマルチアドレスをローカルのピアストアに自動登録
+3. **CapabilityQuery 送信** — 検出したピアに対して自ノードの identity と capability を含む `CapabilityQuery` メッセージを送信
+4. **CapabilityAdvertisement 受信** — 相手ノードが `CapabilityAdvertisement` で応答し、相互に capability 情報を交換
+5. **ピア情報の永続化** — 受信した公開鍵・capability・リッスンアドレスをローカル DB に保存
+
+この交換により、手動で `peer add` を実行することなく、ノード間で認証・通信に必要な情報が自動的に共有されます。
+
+### CapabilityQuery / CapabilityAdvertisement
+
+mDNS 検出時に交換されるメッセージには以下の情報が含まれます。
+
+```json
+{
+  "node_id": "node_...",
+  "public_key": "<base64-encoded Ed25519 public key>",
+  "stop_public_key": "<base64-encoded stop authority key (optional)>",
+  "capabilities": ["openclaw.execution.v1"],
+  "listen_addresses": ["/ip4/192.168.1.20/tcp/9100"],
+  "requested_at": "2026-03-15T10:00:00Z"
+}
+```
+
+### セキュリティ上の考慮事項
+
+<Callout type="warning">
+  mDNS はネットワーク上のすべてのノードを無差別に検出します。以下の点に注意してください。
+</Callout>
+
+- **信頼できるネットワークでのみ使用する** — mDNS はマルチキャストを使用するため、同一 LAN 上のすべてのデバイスが検出対象になります
+- **公開ネットワークでは無効にする** — カフェ、共有オフィスなどでは `mdns = false` を推奨します
+- **メッセージ署名は維持される** — mDNS で検出されたピアとの通信でも、すべてのメッセージは Ed25519 で署名・検証されます
+- **既存のピア登録が優先** — mDNS で検出されたピア情報は、手動登録されたピア情報を上書きしません
+
+### mDNS を無効にする
+
+```toml
+[discovery]
+mdns = false
+```
+
+mDNS は libp2p トランスポート使用時でもデフォルトでは **無効** です。明示的に `true` に設定した場合のみ動作します。
+
+## Relay ノードの構成
+
+NAT の背後にあるノード同士が直接通信できない場合、relay ノードを介してメッセージを中継できます。
+
+### Relay ノードの初期化
+
+```bash
+starweft init --role relay \
+  --data-dir ~/.starweft-relay \
+  --listen /ip4/0.0.0.0/tcp/9300
+```
+
+<Callout type="info">
+  Relay ノードは identity の作成が不要です（`--no-identity` が暗黙的に適用されます）。メッセージの転送のみを行い、署名や検証は実施しません。
+</Callout>
+
+### Relay ノードをピアに登録する
+
+各ノードから relay をピアとして登録します。
+
+```bash
+starweft peer add /ip4/<RELAY_IP>/tcp/9300/p2p/<RELAY_PEER_ID> \
+  --data-dir ~/.starweft-owner
+```
+
+### Relay 設定
+
+```toml
+[p2p]
+transport = "libp2p"
+relay_enabled = true
+direct_preferred = true
+```
+
+- **`relay_enabled`** — relay 経由の通信を許可（デフォルト: `true`）
+- **`direct_preferred`** — 直接接続を優先し、失敗時のみ relay を使用（デフォルト: `true`）
+
+## Seed ピア設定
+
+`config.toml` の `[discovery]` セクションで、起動時に自動接続するシードピアを指定できます。
+
+```toml
+[discovery]
+seeds = [
+  "/ip4/192.168.1.10/tcp/9000/p2p/12D3Koo...",
+  "/ip4/192.168.1.20/tcp/9100/p2p/12D3Koo..."
+]
+auto_discovery = true
+```
+
+- **`seeds`** — 起動時に接続を試行するピアのマルチアドレスリスト
+- **`auto_discovery`** — CapabilityQuery/CapabilityAdvertisement の自動交換を有効にする
+
+<Callout type="tip">
+  `peer add` コマンドは自動的にマルチアドレスを `seeds` に追加します。手動で `config.toml` を編集する必要は通常ありません。
+</Callout>
+
+シードピアへの再接続は 5 秒間隔で自動的に試行されます。接続が切断された場合も自動で復旧します。
+
+## トラブルシューティング
+
+### 接続できない
+
+<Accordion title="ファイアウォールとポートの確認">
+
+リッスンポートが開放されていることを確認してください。
+
+```bash
+# ポートの到達性を確認
+nc -zv <TARGET_IP> <PORT>
+```
+
+Starweft は TCP のみを使用します。UDP ポートの開放は不要です。
+
+</Accordion>
+
+<Accordion title="マルチアドレス形式の確認">
+
+libp2p のシードピアには `/p2p/<peer-id>` サフィックスが必須です。
+
+```bash
+# 正しい形式
+/ip4/192.168.1.20/tcp/9100/p2p/12D3KooWAbcDef...
+
+# 誤った形式（peer-id がない）
+/ip4/192.168.1.20/tcp/9100
+```
+
+</Accordion>
+
+<Accordion title="トランスポートの一致を確認">
+
+通信する両方のノードが同じトランスポート種別を使用していることを確認してください。`local_mailbox` と `libp2p` を混在させることはできません。
+
+```bash
+starweft config show --data-dir ~/.starweft-owner | grep transport
+```
+
+</Accordion>
+
+### ピアが検出されない（mDNS）
+
+<Accordion title="mDNS の有効化を確認">
+
+```bash
+starweft config show --data-dir ~/.starweft-owner | grep mdns
+```
+
+`discovery.mdns = true` であることを確認してください。
+
+</Accordion>
+
+<Accordion title="ネットワークの確認">
+
+- すべてのノードが同一サブネット上にあること
+- マルチキャストトラフィック（UDP 5353）がブロックされていないこと
+- VPN や仮想ネットワーク上では mDNS が機能しない場合があります
+
+</Accordion>
+
+### ログの確認
+
+接続の問題を調査するには、ログを確認してください。
+
+```bash
+starweft logs --data-dir ~/.starweft-owner --component p2p --tail 50
+```
+
+詳細なログが必要な場合は、verbosity を上げて起動します。
+
+```bash
+starweft run --data-dir ~/.starweft-owner --foreground --log-level debug -v
+```
+
+### 設定の検証
+
+```bash
+starweft config validate --data-dir ~/.starweft-owner
+```
+
+このコマンドはリッスンアドレスの形式、鍵ファイルの存在、プロトコルバージョンの互換性などを検証し、警告やエラーを報告します。
+
+## 次のステップ
+
+<LinkCard href="/docs/guides/config" title="設定ガイド" description="トランスポートやディスカバリの詳細設定" />
+<LinkCard href="/docs/concepts/architecture" title="アーキテクチャ" description="P2P 通信モデルの詳細" />
+<LinkCard href="/docs/security/key-management" title="鍵管理" description="Ed25519 鍵の管理とセキュリティ" />

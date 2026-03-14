@@ -10,23 +10,64 @@ description: "Install Starweft on Linux, macOS, or Windows."
 
 SQLite is automatically bundled at build time — no separate installation required.
 
-## Install from crates.io
+## Homebrew (macOS / Linux)
 
-The simplest way to install Starweft:
+```bash
+brew tap co-r-e/tap
+brew install starweft
+```
+
+シェル補完（bash, zsh, fish）も自動的にインストールされます。
+
+## GitHub Releases
+
+[GitHub Releases ページ](https://github.com/co-r-e/starweft/releases) からビルド済みバイナリをダウンロードできます。
+
+<Tabs items="Linux,macOS,Windows">
+
+<div>
+
+```bash
+curl -LO https://github.com/co-r-e/starweft/releases/latest/download/starweft-v0.3.0-x86_64-unknown-linux-gnu.tar.gz
+tar xzf starweft-v0.3.0-x86_64-unknown-linux-gnu.tar.gz
+sudo mv starweft /usr/local/bin/
+```
+
+</div>
+
+<div>
+
+```bash
+curl -LO https://github.com/co-r-e/starweft/releases/latest/download/starweft-v0.3.0-aarch64-apple-darwin.tar.gz
+tar xzf starweft-v0.3.0-aarch64-apple-darwin.tar.gz
+sudo mv starweft /usr/local/bin/
+```
+
+</div>
+
+<div>
+
+PowerShell で zip をダウンロードし、`PATH` の通ったディレクトリに配置してください。
+
+</div>
+
+</Tabs>
+
+## cargo install
 
 ```bash
 cargo install starweft
 ```
 
-## Build from Source
+## ソースからビルド
 
 ```bash
-git clone https://github.com/starweft/starweft.git
+git clone https://github.com/co-r-e/starweft.git
 cd starweft
 cargo build --release
 ```
 
-The binary will be at `target/release/starweft`.
+バイナリは `target/release/starweft` に生成されます。
 
 ## Platform Notes
 

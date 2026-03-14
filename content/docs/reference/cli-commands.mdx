@@ -3,4 +3,802 @@ title: "CLI Commands"
 description: "Complete reference for all Starweft CLI commands and flags."
 ---
 
-Content coming soon. This section will cover a complete reference for all Starweft CLI commands, subcommands, flags, and usage examples.
+## グローバルフラグ
+
+すべてのサブコマンドで利用可能なグローバルフラグです。
+
+<ApiTable data={[
+  { flag: "-v, --verbose", type: "count", default: "0", description: "ログ出力を増やす (-v: debug, -vv: trace)" },
+  { flag: "-q, --quiet", type: "count", default: "0", description: "ログ出力を減らす (-q: warn, -qq: error)。--verbose と排他" },
+]} />
+
+---
+
+## init
+
+ノードのデータディレクトリと `config.toml` を初期化します。
+
+```bash
+starweft init --role <ROLE> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--role", type: "principal | owner | worker | relay", default: "-", description: "必須。ノードの役割" },
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--display-name", type: "string", default: "<role>-node", description: "ノードの表示名" },
+  { flag: "--listen", type: "multiaddr[]", default: "自動生成", description: "リッスンアドレス (複数指定可)" },
+  { flag: "--no-identity", type: "bool", default: "false", description: "identity create の案内を抑制" },
+  { flag: "--force", type: "bool", default: "false", description: "既存 config.toml を上書き" },
+]} />
+
+<Terminal title="例: worker ノードを初期化">
+```bash
+starweft init --role worker --data-dir ~/.starweft-worker
+```
+</Terminal>
+
+---
+
+## run
+
+ノードをフォアグラウンドで起動し、inbox ポーリングとメッセージ処理を開始します。
+
+```bash
+starweft run [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--role", type: "principal | owner | worker | relay", default: "config の値", description: "起動時に role を上書き" },
+  { flag: "--foreground", type: "bool", default: "false", description: "フォアグラウンド実行を明示" },
+  { flag: "--log-level", type: "string", default: "config の値", description: "ログレベルを上書き (debug, info, warn, error, trace)" },
+]} />
+
+<Terminal title="例: owner ノードを起動">
+```bash
+starweft run --data-dir ~/.starweft-owner
+```
+</Terminal>
+
+---
+
+## identity
+
+Ed25519 鍵ペアの生成と表示を行います。
+
+### identity create
+
+actor_key (および principal の場合は stop_authority_key) を生成し、ローカル identity をストアに登録します。
+
+```bash
+starweft identity create [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--principal", type: "bool", default: "false", description: "principal 以外のロールでも stop_authority_key を生成" },
+  { flag: "--force", type: "bool", default: "false", description: "既存の鍵を上書き" },
+]} />
+
+### identity show
+
+ローカル identity 情報を表示します。
+
+```bash
+starweft identity show [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+<Terminal title="例: identity を確認">
+```bash
+starweft identity show --json
+```
+</Terminal>
+
+---
+
+## peer
+
+ピアノードのアドレスと公開鍵を管理します。
+
+### peer add
+
+ピアのマルチアドレスを登録し、discovery seeds に追加します。
+
+```bash
+starweft peer add <MULTIADDR> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "<MULTIADDR>", type: "string", default: "-", description: "必須。ピアのマルチアドレス" },
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--label", type: "string", default: "-", description: "ピアのラベル (表示用)" },
+  { flag: "--actor-id", type: "string", default: "自動生成", description: "ピアの actor ID" },
+  { flag: "--node-id", type: "string", default: "自動生成", description: "ピアの node ID" },
+  { flag: "--public-key", type: "string", default: "-", description: "ピアの公開鍵 (Base64)" },
+  { flag: "--public-key-file", type: "path", default: "-", description: "ピアの公開鍵ファイル。--public-key と排他" },
+  { flag: "--stop-public-key", type: "string", default: "-", description: "ピアの stop authority 公開鍵 (Base64)" },
+  { flag: "--stop-public-key-file", type: "path", default: "-", description: "ピアの stop authority 公開鍵ファイル" },
+  { flag: "--capability", type: "string[]", default: "-", description: "ピアの capability (複数指定可)" },
+]} />
+
+<Terminal title="例: owner ピアを追加">
+```bash
+starweft peer add /unix/~/.starweft-owner/mailbox.sock \
+  --label owner \
+  --public-key "BASE64_PUBLIC_KEY"
+```
+</Terminal>
+
+### peer list
+
+登録済みピアの一覧を表示します。
+
+```bash
+starweft peer list [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+]} />
+
+---
+
+## vision
+
+ビジョン (目標) の投入とプランニングプレビューを行います。
+
+### vision submit
+
+ビジョンを owner に送信し、タスク分解を開始します。**principal ロール専用**です。
+
+```bash
+starweft vision submit --title <TITLE> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--title", type: "string", default: "-", description: "必須。ビジョンのタイトル" },
+  { flag: "--text", type: "string", default: "-", description: "ビジョンのテキスト本文。--file と排他" },
+  { flag: "--file", type: "path", default: "-", description: "ビジョンテキストを読み込むファイル。--text と排他" },
+  { flag: "--constraint", type: "key=value[]", default: "-", description: "制約条件 (複数指定可: budget_mode, human_intervention, allow_external_agents)" },
+  { flag: "--owner", type: "string", default: "自動解決", description: "送信先 owner の actor ID" },
+  { flag: "--dry-run", type: "bool", default: "false", description: "プランニングプレビューのみ実行" },
+  { flag: "--approve", type: "TOKEN", default: "-", description: "プレビューで取得した approval token を指定して submit" },
+  { flag: "--missing-only", type: "bool", default: "false", description: "--dry-run と併用。不足情報のみ表示" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+<Callout type="info">
+`human_intervention=required` の制約を持つビジョンは、先に `--dry-run` でプレビューを確認し、表示される `--approve` トークンを使って submit する必要があります。
+</Callout>
+
+<Terminal title="例: ビジョンを dry-run で確認してから submit">
+```bash
+# Step 1: プレビュー
+starweft vision submit --title "新機能開発" --text "..." --dry-run
+
+# Step 2: approve トークンで submit
+starweft vision submit --title "新機能開発" --text "..." --approve <TOKEN>
+```
+</Terminal>
+
+### vision plan
+
+ビジョンのプランニングプレビューを表示します。submit は行いません。
+
+```bash
+starweft vision plan --title <TITLE> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--title", type: "string", default: "-", description: "必須。ビジョンのタイトル" },
+  { flag: "--text", type: "string", default: "-", description: "ビジョンのテキスト本文。--file と排他" },
+  { flag: "--file", type: "path", default: "-", description: "ビジョンテキストを読み込むファイル" },
+  { flag: "--constraint", type: "key=value[]", default: "-", description: "制約条件 (複数指定可)" },
+  { flag: "--owner", type: "string", default: "-", description: "送信先 owner の actor ID" },
+  { flag: "--missing-only", type: "bool", default: "false", description: "不足情報のみ表示" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+---
+
+## status
+
+ノードのヘルス状態と統計情報を表示します。
+
+```bash
+starweft status [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+  { flag: "--probe", type: "liveness | readiness", default: "-", description: "指定したプローブのみ実行。--watch と排他" },
+  { flag: "--watch", type: "bool", default: "false", description: "ウォッチモードで定期更新" },
+  { flag: "--interval-sec", type: "u64", default: "2", description: "ウォッチモードの更新間隔 (秒)" },
+]} />
+
+<Terminal title="例: readiness プローブを実行">
+```bash
+starweft status --probe readiness
+```
+</Terminal>
+
+---
+
+## snapshot
+
+プロジェクトまたはタスクのスナップショットを表示します。
+
+```bash
+starweft snapshot [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project", type: "string", default: "-", description: "対象プロジェクト ID" },
+  { flag: "--task", type: "string", default: "-", description: "対象タスク ID" },
+  { flag: "--request", type: "bool", default: "false", description: "リモートノードにスナップショットをリクエスト" },
+  { flag: "--owner", type: "string", default: "-", description: "リクエスト先 owner の actor ID" },
+  { flag: "--watch", type: "bool", default: "false", description: "ウォッチモードで定期更新" },
+  { flag: "--interval-sec", type: "u64", default: "2", description: "ウォッチモードの更新間隔 (秒)" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+---
+
+## logs
+
+ランタイムログを表示します。
+
+```bash
+starweft logs [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--component", type: "string", default: "-", description: "コンポーネントでフィルタ" },
+  { flag: "--grep", type: "string", default: "-", description: "テキストパターンでフィルタ" },
+  { flag: "--since-sec", type: "u64", default: "-", description: "直近 N 秒のログのみ表示" },
+  { flag: "--tail", type: "usize", default: "50", description: "末尾 N 行を表示" },
+  { flag: "--follow", type: "bool", default: "false", description: "新しいログを追跡表示" },
+]} />
+
+<Terminal title="例: OpenClaw コンポーネントのログを追跡">
+```bash
+starweft logs --component openclaw --follow
+```
+</Terminal>
+
+---
+
+## events
+
+イベントストアのタスクイベントを表示します。
+
+```bash
+starweft events [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project", type: "string", default: "-", description: "プロジェクト ID でフィルタ" },
+  { flag: "--task", type: "string", default: "-", description: "タスク ID でフィルタ" },
+  { flag: "--msg-type", type: "string", default: "-", description: "メッセージタイプでフィルタ" },
+  { flag: "--tail", type: "usize", default: "20", description: "末尾 N 件を表示" },
+  { flag: "--follow", type: "bool", default: "false", description: "新しいイベントを追跡表示" },
+  { flag: "--interval-sec", type: "u64", default: "2", description: "フォロー時のポーリング間隔 (秒)" },
+]} />
+
+---
+
+## stop
+
+プロジェクトまたはタスクツリーの停止命令を発行します。**principal ロール専用**です。
+
+```bash
+starweft stop --reason-code <CODE> --reason <TEXT> --yes [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project", type: "string", default: "-", description: "停止対象のプロジェクト ID。--task-tree と排他" },
+  { flag: "--task-tree", type: "string", default: "-", description: "停止対象のタスクツリールート ID。--project と排他" },
+  { flag: "--reason-code", type: "string", default: "-", description: "必須。停止理由コード" },
+  { flag: "--reason", type: "string", default: "-", description: "必須。停止理由のテキスト" },
+  { flag: "--yes", type: "bool", default: "false", description: "必須。停止を確認" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+<Callout type="warning">
+`--yes` フラグなしでの実行は `[E_CONFIRMATION_REQUIRED]` エラーになります。停止は取り消しできない操作です。
+</Callout>
+
+<Terminal title="例: プロジェクトを停止">
+```bash
+starweft stop --project proj_01ABCDEF --reason-code user_requested \
+  --reason "目標達成のため停止" --yes
+```
+</Terminal>
+
+---
+
+## wait
+
+指定した条件が満たされるまでポーリングで待機します。
+
+```bash
+starweft wait [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--vision", type: "string", default: "-", description: "対象 vision ID" },
+  { flag: "--project", type: "string", default: "-", description: "対象プロジェクト ID" },
+  { flag: "--task", type: "string", default: "-", description: "対象タスク ID" },
+  { flag: "--stop", type: "string", default: "-", description: "対象 stop ID" },
+  { flag: "--until", type: "string", default: "-", description: "待機条件 (下記参照)" },
+  { flag: "--timeout-sec", type: "u64", default: "120", description: "タイムアウト (秒)" },
+  { flag: "--interval-ms", type: "u64", default: "500", description: "ポーリング間隔 (ミリ秒)" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+`--until` に指定できる値はスコープによって異なります。
+
+<Accordion title="--until の有効な値">
+
+- **`--vision`**: `project_created`, `active`, `stopped`
+- **`--project`**: `available`, `active`, `approval_applied`, `stopping`, `stopped`
+- **`--stop`**: `ordered`, `stopping`, `stopped`
+
+</Accordion>
+
+<Callout type="info">
+`--vision`, `--project`, `--task`, `--stop` はいずれか 1 つだけ指定してください。
+</Callout>
+
+---
+
+## project
+
+プロジェクトの一覧表示と承認を行います。
+
+### project list
+
+プロジェクト一覧を表示します。
+
+```bash
+starweft project list [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--status", type: "string", default: "-", description: "ステータスでフィルタ" },
+  { flag: "--approval-state", type: "string", default: "-", description: "承認状態でフィルタ" },
+  { flag: "--owner", type: "string", default: "-", description: "owner actor ID でフィルタ" },
+  { flag: "--principal", type: "string", default: "-", description: "principal actor ID でフィルタ" },
+  { flag: "--updated-since", type: "RFC3339", default: "-", description: "指定日時以降に更新されたプロジェクトのみ" },
+  { flag: "--limit", type: "usize", default: "-", description: "表示件数の上限" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+### project approve
+
+プロジェクトの実行を承認します。**owner または principal ロール**で実行できます。
+
+```bash
+starweft project approve --project <ID> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project", type: "string", default: "-", description: "必須。承認対象のプロジェクト ID" },
+  { flag: "--owner", type: "string", default: "-", description: "owner の actor ID" },
+  { flag: "--wait", type: "bool", default: "false", description: "承認適用まで待機" },
+  { flag: "--timeout-sec", type: "u64", default: "120", description: "待機タイムアウト (秒)" },
+  { flag: "--interval-ms", type: "u64", default: "500", description: "ポーリング間隔 (ミリ秒)" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+---
+
+## task
+
+タスクの一覧表示、ツリー表示、承認を行います。
+
+### task list
+
+タスク一覧を表示します。
+
+```bash
+starweft task list [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project", type: "string", default: "-", description: "プロジェクト ID でフィルタ" },
+  { flag: "--status", type: "string", default: "-", description: "ステータスでフィルタ" },
+  { flag: "--approval-state", type: "string", default: "-", description: "承認状態でフィルタ" },
+  { flag: "--assignee", type: "string", default: "-", description: "担当者 actor ID でフィルタ" },
+  { flag: "--updated-since", type: "RFC3339", default: "-", description: "指定日時以降に更新されたタスクのみ" },
+  { flag: "--limit", type: "usize", default: "-", description: "表示件数の上限" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+### task tree
+
+タスクの階層構造をツリー表示します。
+
+```bash
+starweft task tree --project <ID> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project", type: "string", default: "-", description: "必須。プロジェクト ID" },
+  { flag: "--root", type: "string", default: "-", description: "ツリーのルートとなるタスク ID" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+### task approve
+
+タスクの実行を承認します。**owner または principal ロール**で実行できます。
+
+```bash
+starweft task approve --task <ID> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--task", type: "string", default: "-", description: "必須。承認対象のタスク ID" },
+  { flag: "--owner", type: "string", default: "-", description: "owner の actor ID" },
+  { flag: "--wait", type: "bool", default: "false", description: "承認適用まで待機" },
+  { flag: "--timeout-sec", type: "u64", default: "120", description: "待機タイムアウト (秒)" },
+  { flag: "--interval-ms", type: "u64", default: "500", description: "ポーリング間隔 (ミリ秒)" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+---
+
+## export
+
+プロジェクト・タスクのデータを JSON または Markdown でエクスポートします。
+
+### export project
+
+```bash
+starweft export project --project <ID> [OPTIONS]
+```
+
+### export task
+
+```bash
+starweft export task --task <ID> [OPTIONS]
+```
+
+### export evaluation
+
+```bash
+starweft export evaluation --project <ID> [OPTIONS]
+```
+
+### export artifacts
+
+```bash
+starweft export artifacts --project <ID> [OPTIONS]
+```
+
+各サブコマンド共通のフラグは以下です。
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project / --task", type: "string", default: "-", description: "必須。対象のプロジェクト ID またはタスク ID" },
+  { flag: "--format", type: "json | markdown", default: "json", description: "出力フォーマット" },
+  { flag: "--output", type: "path", default: "-", description: "出力先ファイルパス (省略時は stdout)" },
+]} />
+
+---
+
+## publish
+
+エクスポートデータを外部サービスに公開します。
+
+### publish context
+
+パブリッシュ用のコンテキストデータを生成します。
+
+```bash
+starweft publish context [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project", type: "string", default: "-", description: "プロジェクト ID。--task と排他" },
+  { flag: "--task", type: "string", default: "-", description: "タスク ID。--project と排他" },
+  { flag: "--format", type: "json | markdown", default: "json", description: "出力フォーマット" },
+  { flag: "--output", type: "path", default: "-", description: "出力先ファイルパス" },
+]} />
+
+### publish dry-run
+
+パブリッシュのドライランを実行し、プレビューを生成します。
+
+```bash
+starweft publish dry-run [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project", type: "string", default: "-", description: "プロジェクト ID。--task と排他" },
+  { flag: "--task", type: "string", default: "-", description: "タスク ID。--project と排他" },
+  { flag: "--target", type: "string", default: "issue", description: "ターゲット種別" },
+  { flag: "--title", type: "string", default: "自動生成", description: "パブリッシュのタイトル" },
+  { flag: "--output", type: "path", default: "-", description: "出力先ファイルパス" },
+]} />
+
+### publish github
+
+GitHub の Issue または Pull Request にコメントを投稿します。
+
+```bash
+starweft publish github --repo <OWNER/REPO> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--project", type: "string", default: "-", description: "プロジェクト ID。--task と排他" },
+  { flag: "--task", type: "string", default: "-", description: "タスク ID。--project と排他" },
+  { flag: "--repo", type: "string", default: "-", description: "必須。owner/repo 形式のリポジトリ指定" },
+  { flag: "--issue", type: "u64", default: "-", description: "Issue 番号。--pr と排他" },
+  { flag: "--pr", type: "u64", default: "-", description: "Pull Request 番号。--issue と排他" },
+  { flag: "--title", type: "string", default: "自動生成", description: "コメントのタイトル" },
+  { flag: "--output", type: "path", default: "-", description: "結果 JSON の出力先ファイル" },
+]} />
+
+<Callout type="info">
+GitHub トークンの設定については[環境変数リファレンス](/docs/reference/env-vars)を参照してください。
+</Callout>
+
+---
+
+## backup
+
+ノードの全データのバックアップと復元を行います。
+
+### backup create
+
+データディレクトリを署名付きバンドルとしてバックアップします。
+
+```bash
+starweft backup create --output <PATH> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--output", type: "path", default: "-", description: "必須。バックアップ出力先ディレクトリ" },
+  { flag: "--force", type: "bool", default: "false", description: "既存の出力先を上書き" },
+]} />
+
+### backup restore
+
+バックアップバンドルからデータを復元します。
+
+```bash
+starweft backup restore --input <PATH> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "復元先データディレクトリのパス" },
+  { flag: "--input", type: "path", default: "-", description: "必須。バックアップバンドルのパス" },
+  { flag: "--force", type: "bool", default: "false", description: "identity 不一致でも強制復元" },
+]} />
+
+<Callout type="warning">
+異なるノードのバックアップを復元する場合は `--force` が必要です。identity の不一致が検出されると `[E_BACKUP_IDENTITY_MISMATCH]` エラーになります。
+</Callout>
+
+---
+
+## repair
+
+データの修復操作を行います。
+
+### repair rebuild-projections
+
+タスクイベントログからプロジェクション (プロジェクト・タスクのスナップショット) を再構築します。
+
+```bash
+starweft repair rebuild-projections [--data-dir <PATH>]
+```
+
+### repair resume-outbox
+
+pending 状態の outbox メッセージを再キューします。
+
+```bash
+starweft repair resume-outbox [--data-dir <PATH>]
+```
+
+### repair list-dead-letters
+
+配送不能メッセージ (dead letters) を一覧表示します。
+
+```bash
+starweft repair list-dead-letters [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--limit", type: "usize", default: "20", description: "表示件数の上限" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+### repair reconcile-running-tasks
+
+ランタイム停止後に running 状態のまま残ったタスクを停止状態に修正します。
+
+```bash
+starweft repair reconcile-running-tasks [--data-dir <PATH>]
+```
+
+---
+
+## audit
+
+イベントログの整合性を検証します。
+
+### audit verify-log
+
+タスクイベントログの署名・ハッシュ・Lamport タイムスタンプの整合性を検証します。
+
+```bash
+starweft audit verify-log [--data-dir <PATH>]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+]} />
+
+---
+
+## openclaw
+
+OpenClaw バイナリの設定を管理します。
+
+### openclaw attach
+
+OpenClaw バイナリのパスと設定を `config.toml` に書き込みます。
+
+```bash
+starweft openclaw attach --bin <PATH> [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--bin", type: "string", default: "-", description: "必須。OpenClaw バイナリのパスまたはコマンド名" },
+  { flag: "--working-dir", type: "path", default: "-", description: "OpenClaw の作業ディレクトリ" },
+  { flag: "--timeout-sec", type: "u64", default: "-", description: "タスク実行タイムアウト (秒)" },
+  { flag: "--enable", type: "bool", default: "false", description: "openclaw.enabled を true に設定" },
+]} />
+
+<Terminal title="例: OpenClaw をアタッチして有効化">
+```bash
+starweft openclaw attach --bin /usr/local/bin/openclaw --enable
+```
+</Terminal>
+
+---
+
+## config
+
+設定ファイルの表示と検証を行います。
+
+### config show
+
+現在の設定を表示します (秘密情報はマスクされます)。
+
+```bash
+starweft config show [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力 (デフォルトは TOML)" },
+]} />
+
+### config validate
+
+設定ファイルの整合性を検証し、警告とエラーを報告します。
+
+```bash
+starweft config validate [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--json", type: "bool", default: "false", description: "JSON 形式で出力" },
+]} />
+
+---
+
+## registry serve
+
+ピアディスカバリ用の HTTP レジストリサーバーを起動します。
+
+```bash
+starweft registry serve [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--bind", type: "string", default: "127.0.0.1:7777", description: "バインドアドレス" },
+  { flag: "--ttl-sec", type: "u64", default: "300", description: "ピアエントリの TTL (秒)" },
+  { flag: "--rate-limit-window-sec", type: "u64", default: "60", description: "レートリミットウィンドウ (秒)" },
+  { flag: "--announce-rate-limit", type: "u64", default: "300", description: "announce エンドポイントのレートリミット" },
+  { flag: "--peers-rate-limit", type: "u64", default: "900", description: "peers エンドポイントのレートリミット" },
+  { flag: "--shared-secret", type: "string", default: "-", description: "HMAC 認証用の共有シークレット (STARWEFT_REGISTRY_SHARED_SECRET 環境変数も可)" },
+  { flag: "--shared-secret-env", type: "string", default: "-", description: "共有シークレットを格納する環境変数名" },
+  { flag: "--max-body-bytes", type: "usize", default: "65536", description: "リクエストボディの最大サイズ (bytes)" },
+  { flag: "--read-timeout-ms", type: "u64", default: "5000", description: "読み取りタイムアウト (ms)" },
+  { flag: "--write-timeout-ms", type: "u64", default: "5000", description: "書き込みタイムアウト (ms)" },
+  { flag: "--allow-insecure-no-auth", type: "bool", default: "false", description: "認証なしでの非ループバックバインドを許可 (非推奨)" },
+]} />
+
+<Callout type="warning">
+非ループバックアドレスにバインドする場合、`--shared-secret` または `--shared-secret-env` が必須です。テスト目的でのみ `--allow-insecure-no-auth` を使用してください。
+</Callout>
+
+---
+
+## metrics
+
+ノードのメトリクスを Prometheus テキスト形式または JSON で出力します。
+
+```bash
+starweft metrics [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--format", type: "prometheus | json", default: "prometheus", description: "出力フォーマット" },
+]} />
+
+---
+
+## dashboard
+
+TUI ダッシュボードをリアルタイムで表示します。
+
+```bash
+starweft dashboard [OPTIONS]
+```
+
+<ApiTable data={[
+  { flag: "--data-dir", type: "path", default: "~/.starweft", description: "データディレクトリのパス" },
+  { flag: "--interval-ms", type: "u64", default: "1000", description: "リフレッシュ間隔 (ミリ秒)" },
+]} />
+
+---
+
+## completions
+
+シェル補完スクリプトを生成します。
+
+```bash
+starweft completions <SHELL>
+```
+
+<ApiTable data={[
+  { flag: "<SHELL>", type: "bash | zsh | fish | powershell | elvish", default: "-", description: "必須。対象シェル" },
+]} />
+
+<Terminal title="例: zsh 補完を設定">
+```bash
+starweft completions zsh > ~/.zfunc/_starweft
+```
+</Terminal>

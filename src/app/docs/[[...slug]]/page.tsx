@@ -19,9 +19,9 @@ interface Props {
 }
 
 /** Generate static paths for all documentation pages. */
-export async function generateStaticParams(): Promise<{ slug: string[] }[]> {
+export async function generateStaticParams(): Promise<{ slug?: string[] }[]> {
   const slugs = await getAllSlugs();
-  return slugs.map((slug) => ({ slug }));
+  return [{ slug: [] }, ...slugs.map((slug) => ({ slug }))];
 }
 
 /** Generate metadata for each documentation page. */

@@ -3,4 +3,489 @@ title: "Error Codes"
 description: "Reference for all Starweft error codes and their meanings."
 ---
 
-Content coming soon. This section will cover a reference for all Starweft error codes (prefixed with [E_*]), their meanings, common causes, and resolution steps.
+## 概要
+
+Starweft のエラーメッセージはすべて `[E_*]` プレフィックス付きで出力されます。エラーコードから原因と対処法を素早く特定できます。
+
+---
+
+## 設定エラー (E_CONFIG_*)
+
+### E_CONFIG_NOT_FOUND
+
+**メッセージ**: `config.toml が見つかりません: <path>`
+
+**原因**: 指定されたデータディレクトリに `config.toml` が存在しません。ホームディレクトリの特定に失敗した場合も発生します。
+
+**対処法**:
+- `starweft init --role <ROLE>` でノードを初期化してください
+- `--data-dir` で正しいパスを指定しているか確認してください
+
+### E_CONFIG_EXISTS
+
+**メッセージ**: `config.toml は既に存在します: <path>`
+
+**原因**: `starweft init` の実行時に既存の `config.toml` が検出されました。
+
+**対処法**:
+- 上書きする場合は `--force` フラグを追加してください
+- 既存の設定を保持する場合は別の `--data-dir` を指定してください
+
+### E_CONFIG_INVALID
+
+**メッセージ**: `設定ファイルに問題があります`
+
+**原因**: `starweft config validate` がエラーを検出しました。
+
+**対処法**:
+- `starweft config validate --json` で詳細なエラー内容を確認してください
+- `config.toml` の構文とフィールド値を修正してください
+
+---
+
+## Identity エラー (E_IDENTITY_*)
+
+### E_IDENTITY_EXISTS
+
+**メッセージ**: `actor_key は既に存在します: <path>` / `stop_authority_key は既に存在します: <path>`
+
+**原因**: `starweft identity create` の実行時に既存の鍵ファイルが検出されました。
+
+**対処法**:
+- 上書きする場合は `--force` フラグを追加してください
+- 既存の identity を維持する場合は何もする必要はありません
+
+### E_IDENTITY_MISSING
+
+**メッセージ**: `local_identity が初期化されていません` / `鍵ファイルを読み込めませんでした: <path>` / `owner identity が初期化されていません` / `worker identity が初期化されていません` / `owner actor key が見つかりません` / `worker actor key が見つかりません`
+
+**原因**: identity が未作成、または鍵ファイルが見つかりません。
+
+**対処法**:
+- `starweft identity create` を実行してください
+- `config.toml` の `identity.actor_key_path` が正しいパスを指していることを確認してください
+
+---
+
+## Peer エラー (E_PEER_*)
+
+### E_PEER_LIMIT
+
+**メッセージ**: `peer 上限に達しています: configured=<max> current=<count>`
+
+**原因**: 登録済みピア数が `p2p.max_peers` の上限に達しています。
+
+**対処法**:
+- `config.toml` の `p2p.max_peers` を増やしてください
+- 不要なピアを削除してください
+
+---
+
+## ロールエラー (E_ROLE_*)
+
+### E_ROLE_MISMATCH
+
+**メッセージ**: `vision submit は principal role でのみ実行できます` / `stop は principal role でのみ実行できます` / `project approve は owner または principal role でのみ実行できます` / `task approve は owner または principal role でのみ実行できます`
+
+**原因**: コマンドの実行に必要なロールと、現在のノードのロールが一致しません。
+
+**対処法**:
+- 正しいロールのノードで実行してください
+- `starweft identity show` でノードのロールを確認できます
+
+---
+
+## プロジェクト・タスクエラー
+
+### E_PROJECT_NOT_FOUND
+
+**メッセージ**: `project が見つかりません` / `principal actor が見つかりません`
+
+**原因**: 指定されたプロジェクト ID がストアに存在しないか、プロジェクトの principal actor が解決できません。
+
+**対処法**:
+- `starweft project list` でプロジェクト ID を確認してください
+- ビジョンが正常に submit されたか確認してください
+
+### E_TASK_NOT_FOUND
+
+**メッセージ**: `task が見つかりません` / `task が project に属していません` / `retry 元 task blueprint が見つかりません` / `planner task blueprint が見つかりません` / `root task が project に属していません`
+
+**原因**: 指定されたタスク ID がストアに存在しないか、指定プロジェクトに属していません。
+
+**対処法**:
+- `starweft task list` でタスク ID を確認してください
+- `--project` と `--task` の組み合わせが正しいことを確認してください
+
+### E_VISION_NOT_FOUND
+
+**メッセージ**: `project に対応する vision が見つかりません`
+
+**原因**: プロジェクトに紐づくビジョンレコードが見つかりません。
+
+**対処法**:
+- ビジョンが正常に submit されたか確認してください
+
+### E_TASK_CANCELLED
+
+**メッセージ**: `openclaw process cancelled`
+
+**原因**: OpenClaw サブプロセスが停止命令 (stop order) によりキャンセルされました。
+
+**対処法**:
+- 意図した停止であれば対処不要です
+- 意図しない停止の場合は `starweft events` で stop order を確認してください
+
+---
+
+## Owner 解決エラー
+
+### E_OWNER_UNRESOLVED
+
+**メッセージ**: `owner peer が見つかりません。--owner を指定してください` / `owner を一意に決定できません。--owner を指定してください`
+
+**原因**: owner ピアが未登録か、複数の候補があり自動解決できません。
+
+**対処法**:
+- `--owner <ACTOR_ID>` で明示的に指定してください
+- `starweft peer list` で登録済みピアを確認してください
+
+---
+
+## 引数エラー (E_ARGUMENT)
+
+### E_ARGUMENT
+
+**メッセージ**: 各種引数バリデーションエラー
+
+代表的なメッセージ:
+
+| メッセージ | 対処法 |
+|---|---|
+| `--project または --task-tree のどちらか一方を指定してください` | 排他的なフラグの片方のみを指定 |
+| `--project または --task のどちらか一方を指定してください` | 排他的なフラグの片方のみを指定 |
+| `--text と --file は同時に指定できません` | どちらか一方を使用 |
+| `--text または --file のどちらかが必要です` | テキスト入力を指定 |
+| `constraint は key=value 形式で指定してください` | `--constraint key=value` の形式で指定 |
+| `--public-key と --public-key-file は同時に指定できません` | どちらか一方を使用 |
+| `--repo は owner/repo 形式で指定してください` | `owner/repo` 形式で指定 |
+| `--issue または --pr のどちらか一方を指定してください` | 排他的なフラグの片方のみを指定 |
+| `--vision / --project / --task / --stop のどれか 1 つだけを指定してください` | wait の対象を 1 つだけ指定 |
+| `--missing-only は --dry-run と一緒に指定してください` | `--dry-run` を追加 |
+| `--approve は --dry-run と同時に指定できません` | `--dry-run` を外す |
+| `RFC3339 timestamp が不正です` | RFC3339 形式 (例: 2026-01-01T00:00:00Z) で指定 |
+| `未対応の format です` | json または markdown を指定 |
+
+---
+
+## 承認エラー
+
+### E_APPROVAL_REQUIRED
+
+**メッセージ**: `human_intervention=required の vision は --approve が必要です。先に preview を確認してください`
+
+**原因**: `human_intervention=required` 制約付きのビジョンで、承認トークンなしに submit しました。
+
+**対処法**:
+1. `starweft vision submit --dry-run ...` でプレビューを実行
+2. 出力される `approval_token` を確認
+3. `starweft vision submit --approve <TOKEN> ...` で submit
+
+### E_APPROVAL_MISMATCH
+
+**メッセージ**: `preview approval token が一致しません`
+
+**原因**: 指定した approval token がプレビュー時に生成されたものと一致しません。ビジョン内容や制約が変更された可能性があります。
+
+**対処法**:
+- `--dry-run` でプレビューを再実行し、新しい approval token を取得してください
+
+---
+
+## 確認エラー
+
+### E_CONFIRMATION_REQUIRED
+
+**メッセージ**: `stop 実行には --yes が必要です`
+
+**原因**: 破壊的操作の確認フラグが指定されていません。
+
+**対処法**:
+- `--yes` フラグを追加してください
+
+---
+
+## プロトコルエラー
+
+### E_PROTOCOL_VERSION
+
+**メッセージ**: `protocol_version が未対応です` / `受信メッセージ protocol が未対応です`
+
+**原因**: ノード間の `protocol_version` が一致していません。
+
+**対処法**:
+- すべてのノードで同じバージョンの Starweft を使用してください
+- `config.toml` の `compatibility.protocol_version` を確認してください
+
+### E_SCHEMA_VERSION
+
+**メッセージ**: `schema_version が未対応です`
+
+**原因**: ストアのスキーマバージョンが現在のランタイムと一致しません。
+
+**対処法**:
+- Starweft を最新バージョンにアップデートしてください
+- `config.toml` の `compatibility.schema_version` を確認してください
+
+### E_BRIDGE_CAPABILITY_VERSION
+
+**メッセージ**: `openclaw.capability_version と compatibility.bridge_capability_version が一致しません`
+
+**原因**: OpenClaw の capability バージョン設定に不整合があります。
+
+**対処法**:
+- `openclaw.capability_version` と `compatibility.bridge_capability_version` を同じ値に揃えてください
+
+---
+
+## 配送・メッセージエラー
+
+### E_MESSAGE_EXPIRED
+
+**メッセージ**: `msg_id=<id> expires_at=<time> skew_sec=<sec>`
+
+**原因**: 受信メッセージが有効期限を超えています。ノード間の時刻ずれの可能性があります。
+
+**対処法**:
+- ノード間の時刻を同期してください (NTP の使用を推奨)
+
+### E_SIGNATURE_VERIFY_FAILED
+
+**メッセージ**: `peer public key が未登録です: <actor_id>`
+
+**原因**: 受信メッセージの署名を検証するためのピア公開鍵がストアに登録されていません。
+
+**対処法**:
+- `starweft peer add` でピアの公開鍵を登録してください
+
+### E_INVALID_MULTIADDR
+
+**メッセージ**: `listen/discovery 設定が不正です` / `<addr>: <error>`
+
+**原因**: multiaddr 文字列のパースに失敗しました。
+
+**対処法**:
+- multiaddr の形式を確認してください (例: `/ip4/127.0.0.1/tcp/4001`, `/unix/<path>`)
+
+---
+
+## Stop Authority エラー
+
+### E_STOP_AUTHORITY_MISSING
+
+**メッセージ**: `principal 用 stop authority 鍵が見つかりません: <path>`
+
+**原因**: stop 命令の署名に必要な stop_authority_key が見つかりません。
+
+**対処法**:
+- `starweft identity create --principal` で stop authority 鍵を生成してください
+
+---
+
+## OpenClaw エラー
+
+### E_OPENCLAW_NOT_FOUND
+
+**メッセージ**: `バイナリが見つかりません: <bin>` / `PATH が未設定です`
+
+**原因**: 指定された OpenClaw バイナリが見つかりません。
+
+**対処法**:
+- OpenClaw がインストールされていることを確認してください
+- フルパスで `--bin` を指定するか、PATH に OpenClaw のディレクトリを追加してください
+
+---
+
+## バックアップ・リストアエラー
+
+### E_BACKUP_EXISTS
+
+**メッセージ**: `backup 出力先は既に存在します: <path>`
+
+**原因**: バックアップ出力先のディレクトリまたはファイルが既に存在します。
+
+**対処法**:
+- `--force` フラグで上書きするか、別の出力先を指定してください
+
+### E_BACKUP_NOT_FOUND
+
+**メッセージ**: `backup 入力先が見つかりません: <path>`
+
+**原因**: リストア対象のバックアップバンドルが見つかりません。
+
+**対処法**:
+- バックアップバンドルのパスが正しいことを確認してください
+
+### E_BACKUP_SIGNATURE_REQUIRED
+
+**メッセージ**: `backup には actor_key が必要です` / `backup 用 actor_key を読み込めません` / `manifest signature is missing`
+
+**原因**: バックアップの署名に必要な actor_key が存在しないか読み込めません。
+
+**対処法**:
+- `starweft identity create` で identity を作成してください
+
+### E_BACKUP_SIGNATURE_INVALID
+
+**メッセージ**: `signer_public_key is missing` / `manifest の signer_public_key がバンドル内の actor_key と一致しません` / `invalid registry signature`
+
+**原因**: バックアップマニフェストの署名検証に失敗しました。バンドルが改ざんされている可能性があります。
+
+**対処法**:
+- バックアップバンドルが破損していないことを確認してください
+- 元のノードで再度バックアップを作成してください
+
+### E_BACKUP_IDENTITY_MISMATCH
+
+**メッセージ**: `バックアップの署名者とリストア先の identity が一致しません`
+
+**原因**: リストア先に既存の identity があり、バックアップの署名者と異なります。
+
+**対処法**:
+- 同一ノードのバックアップであることを確認してください
+- 異なるノードのバックアップを復元するには `--force` フラグを使用してください
+
+### E_BACKUP_MANIFEST_MISSING
+
+**メッセージ**: `manifest.json が見つかりません: <path>`
+
+**原因**: バックアップバンドルに `manifest.json` が含まれていません。
+
+**対処法**:
+- 正しいバックアップバンドルのパスを指定してください
+
+### E_BACKUP_MANIFEST_INVALID
+
+**メッセージ**: `unsupported backup format` / `バンドルに manifest 外のファイルが含まれています` / `invalid path in manifest`
+
+**原因**: バックアップマニフェストの形式が不正です。
+
+**対処法**:
+- 最新バージョンの Starweft で作成されたバックアップを使用してください
+
+### E_BACKUP_CHECKSUM_MISMATCH
+
+**メッセージ**: `backup entry is missing` / `checksum mismatch for <file>`
+
+**原因**: バックアップバンドル内のファイルが欠損しているか、チェックサムが一致しません。
+
+**対処法**:
+- バックアップバンドルが破損していないことを確認してください
+- 元のノードで再度バックアップを作成してください
+
+### E_RESTORE_CONFLICT
+
+**メッセージ**: `restore 先が既に存在します: <path>`
+
+**原因**: リストア先に既存のファイルまたはディレクトリが存在します。
+
+**対処法**:
+- `--force` フラグで上書きするか、別の `--data-dir` を指定してください
+
+---
+
+## 監査エラー
+
+### E_AUDIT_FAILED
+
+**メッセージ**: `task_events に不整合があります`
+
+**原因**: イベントログの整合性検証で不整合が検出されました。
+
+**対処法**:
+- `starweft repair rebuild-projections` でプロジェクションを再構築してください
+- 署名エラーの場合はイベントログが改ざんされた可能性があります
+
+---
+
+## Wait エラー
+
+### E_WAIT_TIMEOUT
+
+**メッセージ**: `condition を満たすまで待機しましたが timeout しました`
+
+**原因**: 指定された条件がタイムアウト時間内に満たされませんでした。
+
+**対処法**:
+- `--timeout-sec` を延長してください
+- `starweft status` や `starweft logs` でノードの状態を確認してください
+
+---
+
+## レジストリエラー (E_REGISTRY_*)
+
+### E_REGISTRY_AUTH
+
+**メッセージ**: 各種認証エラー (`shared secret must not be empty`, `missing header`, `invalid signature`, `replayed registry nonce` 等)
+
+**原因**: レジストリ認証に失敗しました。
+
+**対処法**:
+- `--shared-secret` の値がレジストリサーバーとクライアントで一致していることを確認してください
+- ノード間の時刻同期を確認してください (タイムスタンプドリフトの許容範囲が限られています)
+
+### E_REGISTRY_AUTH_REQUIRED
+
+**メッセージ**: `non-loopback registry bind requires --shared-secret/--shared-secret-env or --allow-insecure-no-auth`
+
+**原因**: 非ループバックアドレスへのバインドで認証が設定されていません。
+
+**対処法**:
+- `--shared-secret` または `--shared-secret-env` で共有シークレットを設定してください
+
+### E_REGISTRY_BIND
+
+**メッセージ**: `registry bind did not resolve to any socket address`
+
+**原因**: バインドアドレスの解決に失敗しました。
+
+**対処法**:
+- `--bind` に有効なアドレス (例: `127.0.0.1:7777`) を指定してください
+
+---
+
+## GitHub パブリッシュエラー
+
+### E_GITHUB_TOKEN_MISSING
+
+**メッセージ**: `GitHub 投稿には STARWEFT_GITHUB_TOKEN / GITHUB_TOKEN / GH_TOKEN のいずれかが必要です`
+
+**原因**: GitHub API 認証用のトークンが環境変数に設定されていません。
+
+**対処法**:
+- `STARWEFT_GITHUB_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN` のいずれかを設定してください
+- 詳細は[環境変数リファレンス](/docs/reference/env-vars)を参照してください
+
+### E_GITHUB_PUBLISH_FAILED
+
+**メッセージ**: `status=<code> body=<response>`
+
+**原因**: GitHub API の呼び出しが失敗しました。
+
+**対処法**:
+- トークンに適切なスコープ (repo 権限) があることを確認してください
+- `--repo` のリポジトリ名と `--issue` / `--pr` 番号が正しいことを確認してください
+
+---
+
+## ステータスプローブエラー
+
+### E_STATUS_PROBE_FAILED
+
+**メッセージ**: `<probe> probe failed`
+
+**原因**: liveness または readiness プローブが失敗しました。
+
+**対処法**:
+- `starweft status --json` でプローブの詳細 (reasons, warnings) を確認してください
+- ノードが正常に起動しているか、`starweft logs` で確認してください
