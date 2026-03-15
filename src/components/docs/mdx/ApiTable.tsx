@@ -13,6 +13,7 @@ interface ApiTableProps {
 }
 
 export function ApiTable({ data }: ApiTableProps): ReactNode {
+  if (!data) return null;
   return (
     <div className="my-6 overflow-x-auto rounded-lg border border-[var(--line)]">
       <table className="w-full border-collapse text-sm">

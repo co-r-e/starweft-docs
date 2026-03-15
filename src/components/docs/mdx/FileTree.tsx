@@ -82,6 +82,7 @@ function TreeNode({
 }
 
 export function FileTree({ data }: FileTreeProps): ReactNode {
+  if (!data) return null;
   return (
     <div className="my-6 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 font-mono">
       {data.map((node) => (
