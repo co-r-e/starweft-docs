@@ -5,10 +5,21 @@ description: "Install Starweft on Linux, macOS, or Windows."
 
 ## Requirements
 
-- **Rust 1.88** or later (managed via `rust-toolchain.toml`)
 - **OpenClaw** binary (or a compatible script) for worker task execution
 
 SQLite is automatically bundled at build time — no separate installation required.
+
+## curl (macOS / Linux)
+
+最もシンプルなインストール方法です。プラットフォームを自動検出し、最新バイナリをダウンロードします。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/co-r-e/starweft/main/scripts/install.sh | sh
+```
+
+<Callout type="info">
+デフォルトでは `/usr/local/bin` にインストールされます。変更する場合は `STARWEFT_INSTALL_DIR` 環境変数を設定してください。
+</Callout>
 
 ## Homebrew (macOS / Linux)
 
@@ -53,7 +64,23 @@ Download the zip file using PowerShell and place the binary in a directory that 
 
 </Tabs>
 
+## npm
+
+Node.js 環境がある場合、npm からもインストールできます。postinstall でプラットフォーム別のバイナリが自動ダウンロードされます。
+
+```bash
+npm install -g starweft
+```
+
+`npx` で一時的に実行することも可能です。
+
+```bash
+npx starweft --version
+```
+
 ## cargo install
+
+Rust ツールチェーンがある場合は crates.io からビルド・インストールできます。
 
 ```bash
 cargo install starweft
