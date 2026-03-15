@@ -3,21 +3,21 @@ title: "Message Signing"
 description: "How Ed25519 signing and canonical JSON ensure message integrity."
 ---
 
-## 概要
+## Overview
 
-Starweft は P2P ネットワーク上のすべてのメッセージに **Ed25519 デジタル署名**を付与します。中央サーバーが存在しないため、メッセージの真正性と完全性は暗号署名のみで保証されます。
+Starweft applies **Ed25519 digital signatures** to every message on the P2P network. Because there is no central server, message authenticity and integrity are guaranteed solely through cryptographic signatures.
 
-署名に使用されるライブラリは [`ed25519-dalek`](https://docs.rs/ed25519-dalek) です。鍵長は秘密鍵・公開鍵ともに 32 バイトで、署名は 64 バイトです。
+The library used for signing is [`ed25519-dalek`](https://docs.rs/ed25519-dalek). Both the secret key and public key are 32 bytes in length, and signatures are 64 bytes.
 
-## 署名フロー
+## Signing Flow
 
-メッセージの署名は以下の手順で行われます。
+Messages are signed through the following steps.
 
 <Steps>
 
-### UnsignedEnvelope の構築
+### Constructing the UnsignedEnvelope
 
-送信側ノードは `UnsignedEnvelope<T>` を作成します。Envelope にはプロトコルバージョン、メッセージ ID、送信元/宛先アクター ID、Lamport タイムスタンプなどのメタデータと、型付きメッセージ本文 (`body`) が含まれます。
+The sending node creates an `UnsignedEnvelope<T>`. The envelope contains metadata such as the protocol version, message ID, source/destination actor IDs, and Lamport timestamp, along with a typed message body (`body`).
 
 ```rust
 let envelope = UnsignedEnvelope::new(actor_id, Some(to_actor_id), body)
@@ -26,9 +26,9 @@ let envelope = UnsignedEnvelope::new(actor_id, Some(to_actor_id), body)
     .with_lamport_ts(lamport_ts);
 ```
 
-### Canonical JSON へのシリアライズ
+### Serializing to Canonical JSON
 
-署名対象のフィールド (`SignableEnvelope`) を **Canonical JSON** にシリアライズします。`signature` フィールドは署名対象に含まれません。
+The signable fields (`SignableEnvelope`) are serialized to **Canonical JSON**. The `signature` field is excluded from the signing target.
 
 ```rust
 let signable_bytes = canonical_json(&SignableEnvelope {
@@ -38,18 +38,18 @@ let signable_bytes = canonical_json(&SignableEnvelope {
 })?;
 ```
 
-### Ed25519 署名
+### Ed25519 Signing
 
-Canonical JSON バイト列に対して Ed25519 秘密鍵で署名を生成します。署名結果は Base64 エンコードされ、`MessageSignature` 構造体に格納されます。
+A signature is generated over the Canonical JSON byte sequence using the Ed25519 secret key. The resulting signature is Base64-encoded and stored in a `MessageSignature` struct.
 
 ```rust
 let signature = keypair.sign_bytes(&signable_bytes)?;
 // MessageSignature { alg: "ed25519", key_id: "...", sig: "<base64>" }
 ```
 
-### Signed Envelope の完成
+### Completing the Signed Envelope
 
-署名付きの `Envelope<T>` が完成し、ネットワーク上に送信されます。
+The signed `Envelope<T>` is now complete and ready to be transmitted over the network.
 
 ```rust
 let signed_envelope = unsigned_envelope.sign(&keypair)?;
@@ -57,85 +57,85 @@ let signed_envelope = unsigned_envelope.sign(&keypair)?;
 
 </Steps>
 
-## 署名検証
+## Signature Verification
 
-受信側は `Envelope::verify_with_key()` で署名を検証します。
+The receiving side verifies the signature using `Envelope::verify_with_key()`.
 
 ```rust
 envelope.verify_with_key(&verifying_key)?;
 ```
 
-検証の手順は以下の通りです。
+The verification process works as follows.
 
-1. `signature.alg` が `"ed25519"` であることを確認
-2. `msg_type` と `body.msg_type()` が一致することを確認
-3. 署名対象フィールドから `SignableEnvelope` を再構築し、Canonical JSON にシリアライズ
-4. 送信者の公開鍵で Ed25519 署名を検証
+1. Confirm that `signature.alg` is `"ed25519"`
+2. Confirm that `msg_type` matches `body.msg_type()`
+3. Reconstruct a `SignableEnvelope` from the signable fields and serialize it to Canonical JSON
+4. Verify the Ed25519 signature using the sender's public key
 
 <Callout type="warning">
-署名検証に失敗したメッセージは破棄されます。`signature_failures` として監査ログに記録されるため、`audit verify-log` で後から検出できます。
+Messages that fail signature verification are discarded. They are recorded as `signature_failures` in the audit log, so they can be detected later using `audit verify-log`.
 </Callout>
 
 ## Wire Envelope
 
-ネットワーク転送時には `WireEnvelope` 形式が使用されます。`body` フィールドが型付き構造体ではなく `serde_json::Value`（非型付き JSON）として保持される点が `Envelope<T>` と異なります。
+During network transmission, the `WireEnvelope` format is used. It differs from `Envelope<T>` in that the `body` field is held as a `serde_json::Value` (untyped JSON) rather than a typed struct.
 
-`WireEnvelope` にも `verify_with_key()` が実装されており、`body` が `Value` 型のままでも署名検証が可能です。これは relay ノードがメッセージ本文をデシリアライズせずに署名を検証できることを意味します。
+`WireEnvelope` also implements `verify_with_key()`, enabling signature verification even when `body` remains a `Value` type. This means relay nodes can verify signatures without deserializing the message body.
 
 ## Canonical JSON
 
-### シリアライズルール
+### Serialization Rules
 
-Canonical JSON は以下のルールでバイト列を決定論的に生成します。
+Canonical JSON deterministically produces a byte sequence according to the following rules.
 
-- **オブジェクトキーはアルファベット順にソート**（再帰的に全ネスト階層で適用）
-- 配列の要素順序は維持
-- スカラー値（数値、文字列、真偽値、null）は標準 JSON 表現
-- 余分な空白は含まない
+- **Object keys are sorted alphabetically** (applied recursively to all nested levels)
+- Array element order is preserved
+- Scalar values (numbers, strings, booleans, null) use standard JSON representation
+- No extraneous whitespace is included
 
 ```json
-// 入力（キー順序不定）
+// Input (key order undefined)
 {"z": 1, "a": {"c": 3, "b": 2}, "m": [{"y": 4, "x": 5}]}
 
-// Canonical JSON 出力（キーがソート済み）
+// Canonical JSON output (keys sorted)
 {"a":{"b":2,"c":3},"m":[{"x":5,"y":4}],"z":1}
 ```
 
-### なぜ Canonical JSON が必要か
+### Why Canonical JSON Is Needed
 
-Ed25519 はバイト列に対して署名を行います。同じ論理的 JSON であっても、キーの並び順やフォーマットが異なればバイト列が変わり、署名検証は失敗します。
+Ed25519 signs over byte sequences. Even if two JSON documents are logically identical, differences in key ordering or formatting will produce different byte sequences, causing signature verification to fail.
 
-Canonical JSON は以下の問題を解決します。
+Canonical JSON addresses the following problems.
 
-- **フィールド挿入順序の違い** -- `serde_json` の `preserve_order` 機能やプラットフォームの差異でキー順序が変わりうる
-- **クロスプラットフォーム決定性** -- 異なる OS・アーキテクチャのノード間でも同一のバイト列を生成
-- **言語間互換性** -- 将来的に Rust 以外のクライアントが参加しても、同一の Canonical JSON ルールに従えば署名検証が可能
+- **Field insertion order differences** -- Key ordering can vary due to `serde_json`'s `preserve_order` feature or platform-specific behavior
+- **Cross-platform determinism** -- Produces identical byte sequences across nodes running on different operating systems and architectures
+- **Cross-language compatibility** -- In the future, even if non-Rust clients participate, they can verify signatures as long as they follow the same Canonical JSON rules
 
 <Callout type="info">
-実装は `starweft-crypto` クレートの `canonical_json()` 関数です。内部では `serde_json::to_value()` で中間値を生成し、`sort_json_keys_recursive()` で全階層のオブジェクトキーをソートした後、`serde_json::to_vec()` で空白なしの JSON バイト列に変換します。
+The implementation is the `canonical_json()` function in the `starweft-crypto` crate. Internally, it generates an intermediate value using `serde_json::to_value()`, sorts object keys at all levels using `sort_json_keys_recursive()`, and then converts to a whitespace-free JSON byte sequence using `serde_json::to_vec()`.
 </Callout>
 
-## mDNS とセキュリティモデル
+## mDNS and the Security Model
 
-Starweft v0.3.0 では、libp2p トランスポート使用時に **mDNS** によるローカルネットワーク上のピア自動発見をサポートしています。設定ファイルの `discovery.mdns = true` で有効化できます。
+In Starweft v0.3.0, automatic peer discovery on the local network via **mDNS** is supported when using the libp2p transport. It can be enabled with `discovery.mdns = true` in the configuration file.
 
-### mDNS は認証されない
+### mDNS Is Not Authenticated
 
-mDNS プロトコル自体には認証メカニズムがありません。同一 LAN 上の任意のノードがピアとして発見される可能性があります。
+The mDNS protocol itself has no authentication mechanism. Any node on the same LAN may be discovered as a peer.
 
-### Ed25519 署名がメッセージ層を保護
+### Ed25519 Signatures Protect the Message Layer
 
-mDNS が認証されていなくても、Starweft のセキュリティは損なわれません。すべてのプロトコルメッセージは Ed25519 で署名されており、以下の保証が維持されます。
+Even though mDNS is unauthenticated, Starweft's security is not compromised. All protocol messages are signed with Ed25519, maintaining the following guarantees.
 
-- **改ざん検知** -- メッセージ内容が改変されると署名検証が失敗する
-- **なりすまし防止** -- 秘密鍵を持たないノードは有効な署名を生成できない
-- **公開鍵によるピア識別** -- `peer add` で登録された公開鍵、または `CapabilityQuery` / `CapabilityAdvertisement` で交換された公開鍵により、ピアの identity を検証できる
+- **Tamper detection** -- Signature verification fails if message content has been altered
+- **Impersonation prevention** -- Nodes without the secret key cannot generate valid signatures
+- **Peer identification via public keys** -- Peer identity can be verified through public keys registered via `peer add` or exchanged through `CapabilityQuery` / `CapabilityAdvertisement`
 
 <Callout type="tip">
-mDNS はあくまでピア発見の利便性のための仕組みです。信頼の根拠はすべて Ed25519 鍵ペアに基づいています。信頼できないネットワークでは `discovery.mdns = false` に設定し、`peer add` による手動ピア登録を使用してください。
+mDNS is purely a convenience mechanism for peer discovery. All trust is rooted in Ed25519 key pairs. On untrusted networks, set `discovery.mdns = false` and use manual peer registration via `peer add`.
 </Callout>
 
-## 関連ページ
+## Related Pages
 
-<LinkCard href="/docs/security/key-management" title="鍵管理" description="Ed25519 鍵の生成、保管、交換方法" />
-<LinkCard href="/docs/security/audit" title="監査" description="イベントログの署名検証と整合性チェック" />
+<LinkCard href="/docs/security/key-management" title="Key Management" description="Ed25519 key generation, storage, and exchange methods" />
+<LinkCard href="/docs/security/audit" title="Audit" description="Signature verification and integrity checks for event logs" />

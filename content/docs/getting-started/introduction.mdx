@@ -22,7 +22,7 @@ Everything runs on your local machine. There are no cloud services to configure,
 
 ### Peer-to-Peer Communication
 
-Nodes communicate directly using either local Unix sockets (for single-machine setups) or libp2p TCP (for multi-machine deployments). There is no central server or coordinator. v0.3.0 からは **mDNS** による LAN 内自動ピア発見にも対応し、手動の `peer add` なしでクラスタ形成が可能です。
+Nodes communicate directly using either local Unix sockets (for single-machine setups) or libp2p TCP (for multi-machine deployments). There is no central server or coordinator. Starting with v0.3.0, **mDNS**-based automatic peer discovery within the LAN is also supported, enabling cluster formation without manual `peer add` commands.
 
 ### Cryptographic Integrity
 

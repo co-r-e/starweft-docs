@@ -3,30 +3,30 @@ title: "Configuration"
 description: "Customize Starweft behavior with TOML configuration files."
 ---
 
-このガイドでは、Starweft の TOML 設定ファイルの構造と主要な設定項目を説明します。
+This guide explains the structure and key settings of Starweft's TOML configuration file.
 
-## 設定ファイルの場所
+## Configuration File Location
 
-設定ファイルはデータディレクトリ内の `config.toml` です。
+The configuration file is `config.toml` inside the data directory.
 
-| プラットフォーム | デフォルトパス |
-|----------------|---------------|
+| Platform | Default Path |
+|----------|-------------|
 | macOS / Linux | `~/.starweft/config.toml` |
 | Windows | `%LOCALAPPDATA%\starweft\config.toml` |
 
-`--data-dir` オプションでデータディレクトリを指定した場合は、そのディレクトリ内の `config.toml` が使用されます。
+If you specify the data directory with the `--data-dir` option, the `config.toml` inside that directory will be used.
 
-## 設定の確認と検証
+## Viewing and Validating Configuration
 
 ### `config show`
 
-現在の設定を表示します。シークレット値は自動的にマスクされます。
+Displays the current configuration. Secret values are automatically masked.
 
 ```bash
 starweft config show --data-dir ~/.starweft
 ```
 
-JSON 形式で出力:
+Output in JSON format:
 
 ```bash
 starweft config show --data-dir ~/.starweft --json
@@ -34,41 +34,41 @@ starweft config show --data-dir ~/.starweft --json
 
 ### `config validate`
 
-設定ファイルの妥当性を検証し、エラーと警告を報告します。
+Validates the configuration file and reports errors and warnings.
 
 ```bash
 starweft config validate --data-dir ~/.starweft
 ```
 
-検証される項目:
-- リッスンアドレスの形式
-- データディレクトリの存在
-- Identity 鍵ファイルの存在とパーミッション
-- プロトコルバージョンとスキーマバージョンの互換性
-- OpenClaw バイナリの存在
-- `capability_version` と `bridge_capability_version` の一致
+Items validated:
+- Listen address format
+- Data directory existence
+- Identity key file existence and permissions
+- Protocol version and schema version compatibility
+- OpenClaw binary existence
+- Match between `capability_version` and `bridge_capability_version`
 
-## 設定セクション一覧
+## Configuration Sections Overview
 
 ```
 config.toml
-├── [node]           — ノードの基本設定
-├── [identity]       — 鍵ファイルのパス
-├── [discovery]      — ピア検出・mDNS・レジストリ
-├── [p2p]            — トランスポート設定
-├── [ledger]         — SQLite データベースのパス
-├── [openclaw]       — OpenClaw ブリッジ設定
-├── [compatibility]  — プロトコルバージョン
-├── [owner]          — Owner ロール固有の設定
-├── [worker]         — Worker ロール固有の設定
-├── [observation]    — プランニング・評価エンジン
-├── [logs]           — ログローテーション
-└── [artifacts]      — 成果物の保存設定
+├── [node]           — Basic node settings
+├── [identity]       — Key file paths
+├── [discovery]      — Peer discovery, mDNS, registry
+├── [p2p]            — Transport settings
+├── [ledger]         — SQLite database path
+├── [openclaw]       — OpenClaw bridge settings
+├── [compatibility]  — Protocol version
+├── [owner]          — Owner role-specific settings
+├── [worker]         — Worker role-specific settings
+├── [observation]    — Planning and evaluation engine
+├── [logs]           — Log rotation
+└── [artifacts]      — Artifact storage settings
 ```
 
-## `[node]` セクション
+## `[node]` Section
 
-ノードの基本設定です。
+Basic node settings.
 
 ```toml
 [node]
@@ -79,25 +79,25 @@ listen = ["/unix//home/user/.starweft/mailbox.sock"]
 log_level = "info"
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `role` | string | ノードの役割: principal / owner / worker / relay |
-| `display_name` | string | ノードの表示名 |
-| `data_dir` | string | データディレクトリのパス |
-| `listen` | string[] | リッスンアドレスのリスト |
-| `log_level` | string | ログレベル: trace / debug / info / warn / error |
+| Field | Type | Description |
+|-------|------|-------------|
+| `role` | string | Node role: principal / owner / worker / relay |
+| `display_name` | string | Display name for the node |
+| `data_dir` | string | Data directory path |
+| `listen` | string[] | List of listen addresses |
+| `log_level` | string | Log level: trace / debug / info / warn / error |
 
-### リッスンアドレスの形式
+### Listen Address Format
 
-| トランスポート | 形式 | 例 |
-|---------------|------|-----|
-| Unix ソケット | `/unix/<path>` | `/unix//home/user/.starweft/mailbox.sock` |
+| Transport | Format | Example |
+|-----------|--------|---------|
+| Unix socket | `/unix/<path>` | `/unix//home/user/.starweft/mailbox.sock` |
 | TCP | `/ip4/<addr>/tcp/<port>` | `/ip4/0.0.0.0/tcp/9100` |
 | IPv6 TCP | `/ip6/<addr>/tcp/<port>` | `/ip6/::1/tcp/9100` |
 
-## `[identity]` セクション
+## `[identity]` Section
 
-Ed25519 鍵ファイルのパスを指定します。
+Specifies the paths to Ed25519 key files.
 
 ```toml
 [identity]
@@ -105,18 +105,18 @@ actor_key_path = "~/.starweft/identity/actor_key"
 stop_authority_key_path = "~/.starweft/identity/stop_authority_key"
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `actor_key_path` | string? | メッセージ署名に使用する Ed25519 秘密鍵のパス |
-| `stop_authority_key_path` | string? | 停止命令の署名に使用する鍵のパス（principal のみ） |
+| Field | Type | Description |
+|-------|------|-------------|
+| `actor_key_path` | string? | Path to the Ed25519 private key used for message signing |
+| `stop_authority_key_path` | string? | Path to the key used for signing stop orders (principal only) |
 
 <Callout type="info">
-  `stop_authority_key_path` は principal ロールでのみ自動生成されます。他のロールでは `null` です。
+  `stop_authority_key_path` is only auto-generated for the principal role. It is `null` for all other roles.
 </Callout>
 
-## `[discovery]` セクション
+## `[discovery]` Section
 
-ピア検出とレジストリの設定です。
+Settings for peer discovery and registry.
 
 ```toml
 [discovery]
@@ -128,24 +128,24 @@ registry_ttl_sec = 300
 registry_heartbeat_sec = 60
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `seeds` | string[] | 起動時に接続するシードピアのマルチアドレス |
-| `auto_discovery` | bool | CapabilityQuery/Advertisement の自動交換 (default: true) |
-| `mdns` | bool | mDNS によるローカルネットワーク自動検出 (default: false) |
-| `registry_url` | string? | ピアレジストリサーバーの URL |
-| `registry_ttl_sec` | u64 | レジストリ登録の TTL（秒） (default: 300) |
-| `registry_heartbeat_sec` | u64 | レジストリへのハートビート間隔（秒） (default: 60) |
-| `registry_shared_secret` | string? | レジストリ認証用の共有シークレット |
-| `registry_shared_secret_env` | string? | 共有シークレットを読み取る環境変数名 |
+| Field | Type | Description |
+|-------|------|-------------|
+| `seeds` | string[] | Multiaddresses of seed peers to connect to at startup |
+| `auto_discovery` | bool | Automatic exchange of CapabilityQuery/Advertisement (default: true) |
+| `mdns` | bool | Automatic discovery on the local network via mDNS (default: false) |
+| `registry_url` | string? | URL of the peer registry server |
+| `registry_ttl_sec` | u64 | TTL for registry registration in seconds (default: 300) |
+| `registry_heartbeat_sec` | u64 | Heartbeat interval to the registry in seconds (default: 60) |
+| `registry_shared_secret` | string? | Shared secret for registry authentication |
+| `registry_shared_secret_env` | string? | Environment variable name to read the shared secret from |
 
 <Callout type="warning">
-  `registry_shared_secret` を設定ファイルに直接記載する場合、ファイルのパーミッションが 0600（所有者のみ読み書き）であることを確認してください。`config show` で表示する際は自動的にマスクされます。
+  If you specify `registry_shared_secret` directly in the configuration file, make sure the file permissions are set to 0600 (read/write for owner only). The value is automatically masked when displayed with `config show`.
 </Callout>
 
-## `[p2p]` セクション
+## `[p2p]` Section
 
-トランスポートの種類と接続設定です。
+Transport type and connection settings.
 
 ```toml
 [p2p]
@@ -155,16 +155,16 @@ direct_preferred = true
 max_peers = 128
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `transport` | string | local_mailbox（Unix デフォルト）または libp2p（Windows デフォルト） |
-| `relay_enabled` | bool | relay ノード経由の通信を許可 (default: true) |
-| `direct_preferred` | bool | 直接接続を優先 (default: true) |
-| `max_peers` | u16 | 最大ピア数 (default: 128) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `transport` | string | local_mailbox (Unix default) or libp2p (Windows default) |
+| `relay_enabled` | bool | Allow communication via relay nodes (default: true) |
+| `direct_preferred` | bool | Prefer direct connections (default: true) |
+| `max_peers` | u16 | Maximum number of peers (default: 128) |
 
-## `[openclaw]` セクション
+## `[openclaw]` Section
 
-OpenClaw ブリッジの設定です。Worker ノードで使用します。
+OpenClaw bridge settings. Used on Worker nodes.
 
 ```toml
 [openclaw]
@@ -175,17 +175,17 @@ timeout_sec = 3600
 capability_version = "openclaw.execution.v1"
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `enabled` | bool | OpenClaw ブリッジを有効にする (default: false) |
-| `bin` | string | OpenClaw バイナリのパス (default: openclaw) |
-| `working_dir` | string? | サブプロセスの作業ディレクトリ |
-| `timeout_sec` | u64 | 実行タイムアウト（秒） (default: 3600) |
-| `capability_version` | string | capability 識別子 (default: openclaw.execution.v1) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `enabled` | bool | Enable the OpenClaw bridge (default: false) |
+| `bin` | string | Path to the OpenClaw binary (default: openclaw) |
+| `working_dir` | string? | Working directory for the subprocess |
+| `timeout_sec` | u64 | Execution timeout in seconds (default: 3600) |
+| `capability_version` | string | Capability identifier (default: openclaw.execution.v1) |
 
-## `[compatibility]` セクション
+## `[compatibility]` Section
 
-プロトコルバージョンとスキーマバージョンの設定です。
+Protocol version and schema version settings.
 
 ```toml
 [compatibility]
@@ -195,20 +195,20 @@ bridge_capability_version = "openclaw.execution.v1"
 allow_legacy_protocols = false
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `protocol_version` | string | メッセージプロトコルバージョン |
-| `schema_version` | string | SQLite スキーマバージョン |
-| `bridge_capability_version` | string | OpenClaw ブリッジの capability バージョン |
-| `allow_legacy_protocols` | bool | 古いプロトコルバージョンを許可 (default: false) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `protocol_version` | string | Message protocol version |
+| `schema_version` | string | SQLite schema version |
+| `bridge_capability_version` | string | OpenClaw bridge capability version |
+| `allow_legacy_protocols` | bool | Allow older protocol versions (default: false) |
 
 <Callout type="warning">
-  `openclaw.capability_version` と `bridge_capability_version` が一致しない場合、ノード起動時にエラーが発生します。
+  If `openclaw.capability_version` and `bridge_capability_version` do not match, an error will occur at node startup.
 </Callout>
 
-## `[owner]` セクション
+## `[owner]` Section
 
-Owner ロール固有の設定です。タスク失敗時のリトライ動作を制御します。
+Owner role-specific settings. Controls retry behavior when tasks fail.
 
 ```toml
 [owner]
@@ -232,24 +232,24 @@ action = "no_retry"
 reason = "permanent task/input failure"
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `max_retry_attempts` | u64 | 最大リトライ回数 (default: 8) |
-| `retry_cooldown_ms` | u64 | リトライ間隔（ミリ秒） (default: 250) |
-| `retry_strategy` | string | リトライ戦略: rule_based (default: rule_based) |
-| `retry_rules` | array | エラーパターンとリトライアクションのルール配列 |
+| Field | Type | Description |
+|-------|------|-------------|
+| `max_retry_attempts` | u64 | Maximum number of retry attempts (default: 8) |
+| `retry_cooldown_ms` | u64 | Interval between retries in milliseconds (default: 250) |
+| `retry_strategy` | string | Retry strategy: rule_based (default: rule_based) |
+| `retry_rules` | array | Array of rules mapping error patterns to retry actions |
 
-### リトライアクション
+### Retry Actions
 
-| アクション | 説明 |
-|-----------|------|
-| `retry_same_worker` | 同じ Worker で再試行 |
-| `retry_different_worker` | 別の Worker で再試行 |
-| `no_retry` | リトライしない |
+| Action | Description |
+|--------|-------------|
+| `retry_same_worker` | Retry on the same Worker |
+| `retry_different_worker` | Retry on a different Worker |
+| `no_retry` | Do not retry |
 
-## `[worker]` セクション
+## `[worker]` Section
 
-Worker ロール固有の設定です。
+Worker role-specific settings.
 
 ```toml
 [worker]
@@ -257,14 +257,14 @@ accept_join_offers = true
 max_active_tasks = 1
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `accept_join_offers` | bool | JoinOffer を自動で受け入れる (default: true) |
-| `max_active_tasks` | u64 | 同時実行可能なタスク数 (default: 1) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `accept_join_offers` | bool | Automatically accept JoinOffers (default: true) |
+| `max_active_tasks` | u64 | Number of tasks that can run concurrently (default: 1) |
 
-## `[observation]` セクション
+## `[observation]` Section
 
-タスクプランニングと評価エンジンの設定です。
+Task planning and evaluation engine settings.
 
 ```toml
 [observation]
@@ -281,23 +281,23 @@ planner_capability_version = "openclaw.plan.v1"
 planner_fallback_to_heuristic = true
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `cache_snapshots` | bool | スナップショットのキャッシュ (default: true) |
-| `cache_ttl_sec` | u64 | キャッシュの有効期間（秒） (default: 30) |
-| `max_planned_tasks` | usize | 1 ビジョンから生成する最大タスク数 (default: 6) |
-| `min_task_objective_chars` | usize | タスク目的の最小文字数 (default: 48) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `cache_snapshots` | bool | Cache snapshots (default: true) |
+| `cache_ttl_sec` | u64 | Cache time-to-live in seconds (default: 30) |
+| `max_planned_tasks` | usize | Maximum number of tasks generated from a single vision (default: 6) |
+| `min_task_objective_chars` | usize | Minimum character count for task objectives (default: 48) |
 | `planner` | string | heuristic / openclaw / openclaw_worker (default: heuristic) |
 | `evaluator` | string | heuristic (default: heuristic) |
-| `planner_bin` | string? | openclaw プランナーのバイナリパス |
-| `planner_working_dir` | string? | プランナーの作業ディレクトリ |
-| `planner_timeout_sec` | u64 | プランナーのタイムアウト（秒） (default: 120) |
-| `planner_capability_version` | string | プランナーの capability バージョン (default: openclaw.plan.v1) |
-| `planner_fallback_to_heuristic` | bool | OpenClaw プランナー失敗時にヒューリスティックへフォールバック (default: true) |
+| `planner_bin` | string? | Binary path for the openclaw planner |
+| `planner_working_dir` | string? | Working directory for the planner |
+| `planner_timeout_sec` | u64 | Planner timeout in seconds (default: 120) |
+| `planner_capability_version` | string | Planner capability version (default: openclaw.plan.v1) |
+| `planner_fallback_to_heuristic` | bool | Fall back to heuristic when the OpenClaw planner fails (default: true) |
 
-## `[logs]` セクション
+## `[logs]` Section
 
-ログローテーションの設定です。
+Log rotation settings.
 
 ```toml
 [logs]
@@ -305,14 +305,14 @@ rotate_max_bytes = 1048576
 max_archives = 5
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `rotate_max_bytes` | u64 | ログファイルの最大サイズ（バイト） (default: 1048576 = 1MB) |
-| `max_archives` | usize | 保持するアーカイブファイル数 (default: 5) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `rotate_max_bytes` | u64 | Maximum log file size in bytes (default: 1048576 = 1MB) |
+| `max_archives` | usize | Number of archive files to retain (default: 5) |
 
-## `[artifacts]` セクション
+## `[artifacts]` Section
 
-タスク成果物の保存設定です。
+Task artifact storage settings.
 
 ```toml
 [artifacts]
@@ -321,13 +321,13 @@ max_files = 256
 max_age_sec = 604800
 ```
 
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `dir` | string | 成果物の保存ディレクトリ |
-| `max_files` | usize | 最大保存ファイル数 (default: 256) |
-| `max_age_sec` | u64 | 成果物の最大保持期間（秒） (default: 604800 = 7日) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `dir` | string | Directory for storing artifacts |
+| `max_files` | usize | Maximum number of stored files (default: 256) |
+| `max_age_sec` | u64 | Maximum retention period for artifacts in seconds (default: 604800 = 7 days) |
 
-## ロール別の推奨設定
+## Recommended Settings by Role
 
 ### Principal
 
@@ -341,7 +341,7 @@ actor_key_path = "~/.starweft/identity/actor_key"
 stop_authority_key_path = "~/.starweft/identity/stop_authority_key"
 ```
 
-Principal はビジョンの投入と停止命令の発行のみを行います。`stop_authority_key_path` は principal ロールでのみ必要です。
+The principal only submits visions and issues stop orders. `stop_authority_key_path` is required only for the principal role.
 
 ### Owner
 
@@ -359,7 +359,7 @@ max_planned_tasks = 6
 cache_snapshots = true
 ```
 
-Owner はタスクの分解・配布・評価を担当します。`max_planned_tasks` はビジョンの複雑さに応じて調整してください。
+The owner is responsible for task decomposition, distribution, and evaluation. Adjust `max_planned_tasks` based on the complexity of the vision.
 
 ### Worker
 
@@ -377,7 +377,7 @@ accept_join_offers = true
 max_active_tasks = 1
 ```
 
-Worker はタスクの実行を担当します。`max_active_tasks` はマシンリソースに応じて調整してください。
+The worker is responsible for task execution. Adjust `max_active_tasks` based on available machine resources.
 
 ### Relay
 
@@ -390,11 +390,11 @@ listen = ["/ip4/0.0.0.0/tcp/9300"]
 transport = "libp2p"
 ```
 
-Relay はメッセージ転送のみを行います。identity や OpenClaw の設定は不要です。
+The relay only forwards messages. Identity and OpenClaw configuration are not required.
 
-## よくある設定シナリオ
+## Common Configuration Scenarios
 
-### シングルマシンの開発環境
+### Single-Machine Development Environment
 
 ```toml
 [p2p]
@@ -404,9 +404,9 @@ transport = "local_mailbox"
 mdns = false
 ```
 
-同一マシン上で複数ノードを起動する場合は、各ノードに異なる `--data-dir` を指定し、Unix ソケットで通信します。
+When running multiple nodes on the same machine, specify a different `--data-dir` for each node and use Unix sockets for communication.
 
-### LAN 内のマルチマシン環境
+### Multi-Machine LAN Environment
 
 ```toml
 [p2p]
@@ -417,9 +417,9 @@ mdns = true
 auto_discovery = true
 ```
 
-同一 LAN 内のノードは mDNS で自動検出されます。
+Nodes on the same LAN are automatically discovered via mDNS.
 
-### インターネット越しの分散環境
+### Distributed Environment Over the Internet
 
 ```toml
 [p2p]
@@ -431,17 +431,17 @@ mdns = false
 seeds = ["/ip4/203.0.113.10/tcp/9300/p2p/12D3Koo..."]
 ```
 
-NAT の背後にあるノードは relay を経由して通信します。mDNS は無効にしてください。
+Nodes behind NAT communicate through a relay. Disable mDNS in this scenario.
 
-## セキュリティに関する注意
+## Security Notes
 
-- 設定ファイルは **0600 パーミッション**（所有者のみ読み書き）で保存されます
-- `registry_shared_secret` は環境変数経由（`registry_shared_secret_env`）での指定を推奨します
-- `config show` はシークレット値を自動的に `<redacted>` にマスクして表示します
-- Windows 環境では、ファイルに隠し属性が設定され、ACL で現在のユーザーのみにアクセスが制限されます
+- Configuration files are saved with **0600 permissions** (read/write for owner only)
+- It is recommended to specify `registry_shared_secret` via an environment variable (`registry_shared_secret_env`)
+- `config show` automatically masks secret values as `<redacted>`
+- On Windows, files are given the hidden attribute and ACLs restrict access to the current user only
 
-## 次のステップ
+## Next Steps
 
-<LinkCard href="/docs/guides/multi-machine" title="マルチマシン構成" description="libp2p トランスポートとmDNS による分散ノード構成" />
-<LinkCard href="/docs/guides/openclaw" title="OpenClaw 統合" description="OpenClaw ブリッジの詳細設定" />
-<LinkCard href="/docs/reference/config-file" title="設定リファレンス" description="全設定項目の一覧" />
+<LinkCard href="/docs/guides/multi-machine" title="Multi-Machine Setup" description="Distributed node configuration with libp2p transport and mDNS" />
+<LinkCard href="/docs/guides/openclaw" title="OpenClaw Integration" description="Detailed OpenClaw bridge configuration" />
+<LinkCard href="/docs/reference/config-file" title="Configuration Reference" description="Complete list of all configuration options" />

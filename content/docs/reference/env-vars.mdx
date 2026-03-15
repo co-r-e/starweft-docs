@@ -3,72 +3,72 @@ title: "Environment Variables"
 description: "Environment variables that affect Starweft behavior."
 ---
 
-## 概要
+## Overview
 
-Starweft の動作に影響する環境変数の一覧です。Starweft は P2P CLI ツールであり、すべてローカルマシン上で動作するため、環境変数はプロセスごとに設定します。
+This is a list of environment variables that affect Starweft's behavior. Starweft is a P2P CLI tool that runs entirely on the local machine, so environment variables are set per process.
 
 ---
 
-## 環境変数一覧
+## Environment Variables List
 
-| 環境変数 | 型 | デフォルト | 説明 |
+| Environment Variable | Type | Default | Description |
 |---------|-----|-----------|------|
-| `STARWEFT_GITHUB_TOKEN` | string | - | GitHub API 認証トークン。publish github コマンドで使用。最優先 |
-| `GITHUB_TOKEN` | string | - | GitHub API 認証トークン。STARWEFT_GITHUB_TOKEN が未設定時にフォールバック |
-| `GH_TOKEN` | string | - | GitHub API 認証トークン。上記 2 つが未設定時にフォールバック |
-| `STARWEFT_GITHUB_API_BASE_URL` | string | `https://api.github.com` | GitHub API のベース URL。GitHub Enterprise 等で変更する場合に使用 |
-| `STARWEFT_REGISTRY_SHARED_SECRET` | string | - | レジストリ認証用の共有シークレット。registry serve の --shared-secret フラグと同等 |
-| `RUST_LOG` | string | info | ログフィルタ。-v/-q フラグや --log-level, config の log_level が未指定時にフォールバック |
+| `STARWEFT_GITHUB_TOKEN` | string | - | GitHub API authentication token. Used by the publish github command. Highest priority |
+| `GITHUB_TOKEN` | string | - | GitHub API authentication token. Fallback when STARWEFT_GITHUB_TOKEN is not set |
+| `GH_TOKEN` | string | - | GitHub API authentication token. Fallback when the above two are not set |
+| `STARWEFT_GITHUB_API_BASE_URL` | string | `https://api.github.com` | Base URL for the GitHub API. Used when connecting to GitHub Enterprise, etc. |
+| `STARWEFT_REGISTRY_SHARED_SECRET` | string | - | Shared secret for registry authentication. Equivalent to the --shared-secret flag of registry serve |
+| `RUST_LOG` | string | info | Log filter. Fallback when -v/-q flags, --log-level, and the config log_level are not specified |
 
 ---
 
-## GitHub トークンの優先順位
+## GitHub Token Priority
 
-`starweft publish github` コマンドは、以下の優先順位で GitHub API トークンを解決します。
+The `starweft publish github` command resolves the GitHub API token in the following priority order.
 
 <Steps>
 
 ### STARWEFT_GITHUB_TOKEN
 
-Starweft 専用のトークン。他のツールとの競合を避けたい場合に使用します。
+A Starweft-specific token. Use this when you want to avoid conflicts with other tools.
 
 ### GITHUB_TOKEN
 
-GitHub Actions やその他のツールで広く使われる汎用トークン。
+A general-purpose token widely used by GitHub Actions and other tools.
 
 ### GH_TOKEN
 
-GitHub CLI (`gh`) が使用するトークン。
+The token used by GitHub CLI (`gh`).
 
 </Steps>
 
-いずれも設定されていない場合、`[E_GITHUB_TOKEN_MISSING]` エラーが発生します。
+If none of these are set, an `[E_GITHUB_TOKEN_MISSING]` error occurs.
 
 ```bash
-# 推奨: Starweft 専用トークンを設定
+# Recommended: Set a Starweft-specific token
 export STARWEFT_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
 
-# または既存の GitHub CLI トークンを流用
-# (gh auth token の出力を使う場合)
+# Or reuse an existing GitHub CLI token
+# (when using the output of gh auth token)
 export GH_TOKEN=$(gh auth token)
 ```
 
 <Callout type="warning">
-トークンには対象リポジトリへの書き込み権限 (repo スコープ) が必要です。Issue や Pull Request にコメントを投稿するために使用されます。
+The token requires write access (repo scope) to the target repository. It is used to post comments on Issues and Pull Requests.
 </Callout>
 
 ---
 
-## レジストリ認証
+## Registry Authentication
 
-`starweft registry serve` コマンドは `STARWEFT_REGISTRY_SHARED_SECRET` 環境変数から共有シークレットを読み取れます。CLI フラグ (`--shared-secret`) でも指定可能です。
+The `starweft registry serve` command can read the shared secret from the `STARWEFT_REGISTRY_SHARED_SECRET` environment variable. It can also be specified via the CLI flag (`--shared-secret`).
 
 ```bash
 export STARWEFT_REGISTRY_SHARED_SECRET="your-secret-here"
 starweft registry serve --bind 0.0.0.0:7777
 ```
 
-`config.toml` の `discovery.registry_shared_secret_env` を使うと、クライアント側でもシークレットを環境変数経由で渡せます。
+Using `discovery.registry_shared_secret_env` in `config.toml` allows client-side secrets to be passed via environment variables as well.
 
 ```toml
 [discovery]
@@ -77,55 +77,55 @@ registry_shared_secret_env = "MY_REGISTRY_SECRET"
 ```
 
 <Callout type="tip">
-`config.toml` にシークレットを直接記載するよりも、`registry_shared_secret_env` で環境変数名を指定する方法を推奨します。設定ファイルをバージョン管理に含める際にシークレットの漏洩を防げます。
+Rather than writing the secret directly in `config.toml`, it is recommended to specify the environment variable name via `registry_shared_secret_env`. This prevents secret leakage when the configuration file is included in version control.
 </Callout>
 
 ---
 
-## ログレベル制御
+## Log Level Control
 
-ログレベルの解決は以下の優先順位で行われます。
+Log level resolution follows this priority order.
 
 <Steps>
 
-### CLI フラグ (-v / -q)
+### CLI flags (-v / -q)
 
-`-v` で debug、`-vv` で trace。`-q` で warn、`-qq` で error。最優先です。
+`-v` for debug, `-vv` for trace. `-q` for warn, `-qq` for error. Highest priority.
 
-### --log-level フラグ (run コマンド)
+### --log-level flag (run command)
 
-`starweft run --log-level debug` のように指定。
+Specified as `starweft run --log-level debug`.
 
-### config.toml の node.log_level
+### node.log_level in config.toml
 
-設定ファイルの値。`starweft run` 時のみ参照されます。
+The value from the configuration file. Only referenced during `starweft run`.
 
-### RUST_LOG 環境変数
+### RUST_LOG environment variable
 
-上記がすべて未指定時のフォールバック。
+Fallback when all of the above are unspecified.
 
-### デフォルト値 (info)
+### Default value (info)
 
-いずれも未設定の場合は `info` レベルが使用されます。
+If none are set, the `info` level is used.
 
 </Steps>
 
 ```bash
-# すべてのコマンドで debug ログを出力
+# Output debug logs for all commands
 starweft -v status
 
-# run コマンドで trace ログを出力
+# Output trace logs for the run command
 starweft run --log-level trace
 
-# RUST_LOG でモジュール単位の制御
+# Per-module control with RUST_LOG
 RUST_LOG="starweft=debug,starweft_p2p=trace" starweft run
 ```
 
 ---
 
-## GitHub Enterprise 対応
+## GitHub Enterprise Support
 
-`STARWEFT_GITHUB_API_BASE_URL` を設定すると、GitHub Enterprise Server の API エンドポイントを使用できます。
+Setting `STARWEFT_GITHUB_API_BASE_URL` allows you to use a GitHub Enterprise Server API endpoint.
 
 ```bash
 export STARWEFT_GITHUB_API_BASE_URL="https://github.example.com/api/v3"
@@ -135,5 +135,5 @@ starweft publish github --repo org/repo --issue 42
 ```
 
 <Callout type="info">
-末尾のスラッシュは自動的に除去されます。
+A trailing slash is automatically removed.
 </Callout>

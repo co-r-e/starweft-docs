@@ -3,58 +3,58 @@ title: "Key Management"
 description: "Managing Ed25519 keys, file permissions, and identity lifecycle."
 ---
 
-## 概要
+## Overview
 
-Starweft のセキュリティモデルは **Ed25519 鍵ペア**に基づいています。各ノードは最低 1 つの鍵ペア（`actor_key`）を持ち、すべてのプロトコルメッセージに署名します。principal ノードはさらに停止権限用の鍵ペア（`stop_authority_key`）を持ちます。
+Starweft's security model is based on **Ed25519 key pairs**. Each node has at least one key pair (`actor_key`) and signs all protocol messages with it. Principal nodes additionally have a key pair for stop authority (`stop_authority_key`).
 
-## 鍵の種類
+## Key Types
 
-| 鍵の名前 | 説明 |
+| Key Name | Description |
 |---------|------|
-| `actor_key` | ノードの主 identity 鍵。全メッセージの署名に使用される。すべてのロールで必須。 |
-| `stop_authority_key` | 停止命令 (StopOrder) の署名に使用される専用鍵。principal ノードで生成される。 |
+| `actor_key` | The node's primary identity key. Used to sign all messages. Required for all roles. |
+| `stop_authority_key` | A dedicated key used to sign stop orders (StopOrder). Generated on principal nodes. |
 
 ### actor_key
 
-`actor_key` はノードのメイン identity です。プロトコル上のすべてのメッセージ（`VisionIntent`、`TaskDelegated`、`TaskResultSubmitted` など）がこの鍵で署名されます。公開鍵はピア間で共有され、署名検証に使用されます。
+The `actor_key` is the node's main identity. All protocol messages (`VisionIntent`, `TaskDelegated`, `TaskResultSubmitted`, etc.) are signed with this key. The public key is shared among peers and used for signature verification.
 
 ### stop_authority_key
 
-`stop_authority_key` はプロジェクトやタスクツリーの停止命令 (`StopOrder`) を発行する権限を示す鍵です。`ProjectCharter` の `stop_authority_actor_id` に登録されたアクターだけが有効な停止命令を発行できます。
+The `stop_authority_key` is a key that represents the authority to issue stop orders (`StopOrder`) for projects and task trees. Only actors registered in the `stop_authority_actor_id` field of the `ProjectCharter` can issue valid stop orders.
 
 <Callout type="info">
-`stop_authority_key` は principal ノード、または `--principal` フラグ付きで `identity create` を実行したノードにのみ生成されます。worker や relay ノードは通常この鍵を持ちません。
+The `stop_authority_key` is generated only on principal nodes or on nodes where `identity create` is run with the `--principal` flag. Worker and relay nodes typically do not have this key.
 </Callout>
 
-## 鍵の生成
+## Key Generation
 
-`identity create` コマンドで Ed25519 鍵ペアを生成します。
+Use the `identity create` command to generate Ed25519 key pairs.
 
 <Tabs items="worker / owner / relay,principal">
 
 ```bash
-# worker / owner / relay ノード: actor_key のみ生成
+# worker / owner / relay node: generates actor_key only
 starweft identity create
 ```
 
 ```bash
-# principal ノード: actor_key + stop_authority_key を生成
+# principal node: generates actor_key + stop_authority_key
 starweft identity create --principal
 ```
 
 </Tabs>
 
-生成時の処理は以下の通りです。
+The generation process works as follows.
 
 <Steps>
 
-### 鍵ペアの生成
+### Key Pair Generation
 
-`ed25519-dalek` の `SigningKey::generate()` を使用し、OS の暗号安全乱数生成器 (`OsRng`) から Ed25519 鍵ペアを生成します。
+An Ed25519 key pair is generated using `ed25519-dalek`'s `SigningKey::generate()` with the OS's cryptographically secure random number generator (`OsRng`).
 
-### ファイルへの保存
+### Saving to File
 
-鍵ペアは JSON 形式でファイルに書き出されます。
+The key pair is written to a file in JSON format.
 
 ```json
 {
@@ -65,43 +65,43 @@ starweft identity create --principal
 }
 ```
 
-### パーミッションの設定
+### Setting Permissions
 
-秘密鍵ファイルは所有者のみ読み書き可能な権限で保護されます（後述）。
+The secret key file is protected with permissions that allow only the owner to read and write (detailed below).
 
-### identity の登録
+### Identity Registration
 
-`ActorId` と `NodeId` が自動生成され、SQLite ストアの `local_identity` テーブルに登録されます。設定ファイル (`config.toml`) の `identity.actor_key_path` も自動更新されます。
+An `ActorId` and `NodeId` are automatically generated and registered in the `local_identity` table of the SQLite store. The `identity.actor_key_path` in the configuration file (`config.toml`) is also automatically updated.
 
 </Steps>
 
-### 鍵の上書き
+### Key Overwriting
 
-既存の鍵がある場合、`--force` フラグで上書きできます。
+If an existing key is present, it can be overwritten using the `--force` flag.
 
 ```bash
 starweft identity create --force
 ```
 
 <Callout type="warning">
-`--force` による上書きは**不可逆操作**です。古い鍵で署名されたメッセージは、新しい鍵では検証できなくなります。上書き前に必ず `backup create` でバックアップを取ってください。
+Overwriting with `--force` is an **irreversible operation**. Messages signed with the old key can no longer be verified with the new key. Always create a backup with `backup create` before overwriting.
 </Callout>
 
-## ファイルの保管場所
+## File Storage Location
 
-鍵ファイルはデータディレクトリの `identity/` サブディレクトリに保存されます。
+Key files are stored in the `identity/` subdirectory of the data directory.
 
 ```
 ~/.starweft/
 ├── config.toml
 └── identity/
-    ├── actor_key              # メイン identity 鍵
-    └── stop_authority_key     # 停止権限鍵 (principal のみ)
+    ├── actor_key              # Main identity key
+    └── stop_authority_key     # Stop authority key (principal only)
 ```
 
-### config.toml でのパス設定
+### Path Configuration in config.toml
 
-設定ファイルの `[identity]` セクションで鍵ファイルのパスを指定できます。
+Key file paths can be specified in the `[identity]` section of the configuration file.
 
 ```toml
 [identity]
@@ -109,19 +109,19 @@ actor_key_path = "~/.starweft/identity/actor_key"
 stop_authority_key_path = "~/.starweft/identity/stop_authority_key"
 ```
 
-`identity create` コマンドは設定に指定されたパスに鍵を生成し、未設定の場合はデフォルトパス (`<data_dir>/identity/actor_key`) を使用して設定を自動更新します。
+The `identity create` command generates keys at the path specified in the configuration. If no path is configured, it uses the default path (`<data_dir>/identity/actor_key`) and automatically updates the configuration.
 
-## ファイルパーミッション
+## File Permissions
 
-秘密鍵ファイルの不正アクセスを防ぐため、プラットフォームごとに適切なパーミッションが設定されます。
+To prevent unauthorized access to secret key files, appropriate permissions are set for each platform.
 
 <Tabs items="Unix (macOS / Linux),Windows">
 
 ### Unix
 
-- **鍵ファイル**: `0600`（所有者のみ読み書き可能）
-- **identity ディレクトリ**: `0700`（所有者のみアクセス可能）
-- **config.toml**: `0600`（所有者のみ読み書き可能）
+- **Key files**: `0600` (owner read/write only)
+- **Identity directory**: `0700` (owner access only)
+- **config.toml**: `0600` (owner read/write only)
 
 ```bash
 $ ls -la ~/.starweft/identity/
@@ -131,30 +131,30 @@ $ ls -la ~/.starweft/identity/
 
 ### Windows
 
-- **鍵ファイル**: `icacls` でカレントユーザーのみにフルコントロール (`(F)`) を付与し、継承を削除 (`/inheritance:r`)
-- **データディレクトリ**: `icacls` でユーザーに `(OI)(CI)F`（オブジェクト継承・コンテナ継承付きフルコントロール）を付与
-- **鍵ファイルの読み取り専用属性**: 上書き時に一時解除し、書き込み後に再設定
+- **Key files**: `icacls` grants full control (`(F)`) only to the current user and removes inheritance (`/inheritance:r`)
+- **Data directory**: `icacls` grants `(OI)(CI)F` (object inherit and container inherit with full control) to the user
+- **Key file read-only attribute**: Temporarily removed during overwrite, then re-applied after writing
 
 <Callout type="info">
-Windows では `icacls` コマンドが利用できない環境もあります。その場合、ACL 設定はスキップされますが警告ログが出力されます。
+On Windows, the `icacls` command may not be available in some environments. In that case, ACL configuration is skipped but a warning is logged.
 </Callout>
 
 </Tabs>
 
-## 公開鍵の交換
+## Public Key Exchange
 
-ピア間で公開鍵を共有する方法は 2 つあります。
+There are two methods for sharing public keys between peers.
 
-### 手動交換: `peer add`
+### Manual Exchange: `peer add`
 
-`identity show` で取得した公開鍵を、相手ノードで `peer add` コマンドにより登録します。
+Retrieve the public key using `identity show`, then register it on the other node using the `peer add` command.
 
 ```bash
-# ノード A の公開鍵を確認
+# Check Node A's public key
 starweft identity show
-# 出力例: public_key: dGVzdC1wdWJsaWMta2V5...
+# Example output: public_key: dGVzdC1wdWJsaWMta2V5...
 
-# ノード B でノード A を登録
+# Register Node A on Node B
 starweft peer add /ip4/192.168.1.10/tcp/9000 \
   --public-key "dGVzdC1wdWJsaWMta2V5..." \
   --stop-public-key "c3RvcC1wdWJsaWMta2V5..." \
@@ -162,7 +162,7 @@ starweft peer add /ip4/192.168.1.10/tcp/9000 \
   --node-id "node_01DEF..."
 ```
 
-公開鍵はファイルから読み込むこともできます。
+Public keys can also be loaded from a file.
 
 ```bash
 starweft peer add /ip4/192.168.1.10/tcp/9000 \
@@ -170,9 +170,9 @@ starweft peer add /ip4/192.168.1.10/tcp/9000 \
   --stop-public-key-file ./peer_a_stop_pubkey.txt
 ```
 
-### 自動交換: CapabilityQuery / CapabilityAdvertisement
+### Automatic Exchange: CapabilityQuery / CapabilityAdvertisement
 
-ノード起動時に `CapabilityQuery` メッセージをブロードキャストし、`CapabilityAdvertisement` で応答を受け取ることで公開鍵が自動交換されます。
+At node startup, a `CapabilityQuery` message is broadcast, and public keys are automatically exchanged when a `CapabilityAdvertisement` response is received.
 
 ```json
 {
@@ -187,34 +187,34 @@ starweft peer add /ip4/192.168.1.10/tcp/9000 \
 }
 ```
 
-交換された公開鍵は SQLite ストアの `peer_identities` テーブルに保存され、以降のメッセージ署名検証に使用されます。
+Exchanged public keys are stored in the `peer_identities` table of the SQLite store and used for subsequent message signature verification.
 
 <Callout type="warning">
-自動交換は利便性のための仕組みです。信頼できないネットワーク環境では、手動での `peer add` による公開鍵登録を推奨します。
+Automatic exchange is a convenience mechanism. In untrusted network environments, manual public key registration via `peer add` is recommended.
 </Callout>
 
-## 鍵のバックアップ
+## Key Backup
 
-鍵ファイルは `backup create` コマンドでデータディレクトリ全体とともにバックアップできます。
+Key files can be backed up along with the entire data directory using the `backup create` command.
 
 ```bash
 starweft backup create --output ~/starweft-backup
 ```
 
-バックアップには以下が含まれます。
+The backup includes the following.
 
-- `identity/actor_key` -- メイン identity 鍵
-- `identity/stop_authority_key` -- 停止権限鍵（存在する場合）
-- `config.toml` -- 鍵パス設定を含む設定ファイル
-- `ledger/node.db` -- イベントログ・ピア情報を含む SQLite データベース
+- `identity/actor_key` -- Main identity key
+- `identity/stop_authority_key` -- Stop authority key (if present)
+- `config.toml` -- Configuration file including key path settings
+- `ledger/node.db` -- SQLite database containing event logs and peer information
 
 <Callout type="error">
-**秘密鍵を紛失すると、そのノードの identity は回復できません。** 他ノードに登録された公開鍵との対応も失われます。定期的なバックアップを強く推奨します。
+**If the secret key is lost, the node's identity cannot be recovered.** The correspondence with public keys registered on other nodes is also lost. Regular backups are strongly recommended.
 </Callout>
 
-バックアップの詳細については [監査ページ](/docs/security/audit) を参照してください。
+For more details on backups, see the [Audit page](/docs/security/audit).
 
-## 関連ページ
+## Related Pages
 
-<LinkCard href="/docs/security/signing" title="メッセージ署名" description="Ed25519 署名と Canonical JSON による完全性保証" />
-<LinkCard href="/docs/security/audit" title="監査" description="イベントログの署名検証とバックアップの整合性チェック" />
+<LinkCard href="/docs/security/signing" title="Message Signing" description="Integrity guarantees through Ed25519 signing and Canonical JSON" />
+<LinkCard href="/docs/security/audit" title="Audit" description="Signature verification and backup integrity checks for event logs" />

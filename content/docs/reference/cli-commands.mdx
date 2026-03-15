@@ -3,35 +3,35 @@ title: "CLI Commands"
 description: "Complete reference for all Starweft CLI commands and flags."
 ---
 
-## グローバルフラグ
+## Global Flags
 
-すべてのサブコマンドで利用可能なグローバルフラグです。
+Global flags available for all subcommands.
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `-v, --verbose` | count | `0` | ログ出力を増やす (-v: debug, -vv: trace) |
-| `-q, --quiet` | count | `0` | ログ出力を減らす (-q: warn, -qq: error)。--verbose と排他 |
+| `-v, --verbose` | count | `0` | Increase log output (-v: debug, -vv: trace) |
+| `-q, --quiet` | count | `0` | Decrease log output (-q: warn, -qq: error). Mutually exclusive with --verbose |
 
 ---
 
 ## init
 
-ノードのデータディレクトリと `config.toml` を初期化します。
+Initializes the node's data directory and `config.toml`.
 
 ```bash
 starweft init --role <ROLE> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--role` | principal \| owner \| worker \| relay | - | 必須。ノードの役割 |
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--display-name` | string | `<role>-node` | ノードの表示名 |
-| `--listen` | multiaddr[] | 自動生成 | リッスンアドレス (複数指定可) |
-| `--no-identity` | bool | `false` | identity create の案内を抑制 |
-| `--force` | bool | `false` | 既存 config.toml を上書き |
+| `--role` | principal \| owner \| worker \| relay | - | Required. The node's role |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--display-name` | string | `<role>-node` | Display name for the node |
+| `--listen` | multiaddr[] | auto-generated | Listen addresses (multiple can be specified) |
+| `--no-identity` | bool | `false` | Suppress the identity create prompt |
+| `--force` | bool | `false` | Overwrite existing config.toml |
 
-<Terminal title="例: worker ノードを初期化">
+<Terminal title="Example: Initialize a worker node">
 ```bash
 starweft init --role worker --data-dir ~/.starweft-worker
 ```
@@ -41,20 +41,20 @@ starweft init --role worker --data-dir ~/.starweft-worker
 
 ## run
 
-ノードをフォアグラウンドで起動し、inbox ポーリングとメッセージ処理を開始します。
+Starts the node in the foreground and begins inbox polling and message processing.
 
 ```bash
 starweft run [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--role` | principal \| owner \| worker \| relay | config の値 | 起動時に role を上書き |
-| `--foreground` | bool | `false` | フォアグラウンド実行を明示 |
-| `--log-level` | string | config の値 | ログレベルを上書き (debug, info, warn, error, trace) |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--role` | principal \| owner \| worker \| relay | config value | Override the role at startup |
+| `--foreground` | bool | `false` | Explicitly run in the foreground |
+| `--log-level` | string | config value | Override the log level (debug, info, warn, error, trace) |
 
-<Terminal title="例: owner ノードを起動">
+<Terminal title="Example: Start an owner node">
 ```bash
 starweft run --data-dir ~/.starweft-owner
 ```
@@ -64,36 +64,36 @@ starweft run --data-dir ~/.starweft-owner
 
 ## identity
 
-Ed25519 鍵ペアの生成と表示を行います。
+Generates and displays Ed25519 key pairs.
 
 ### identity create
 
-actor_key (および principal の場合は stop_authority_key) を生成し、ローカル identity をストアに登録します。
+Generates actor_key (and stop_authority_key for principal nodes) and registers the local identity in the store.
 
 ```bash
 starweft identity create [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--principal` | bool | `false` | principal 以外のロールでも stop_authority_key を生成 |
-| `--force` | bool | `false` | 既存の鍵を上書き |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--principal` | bool | `false` | Generate stop_authority_key even for non-principal roles |
+| `--force` | bool | `false` | Overwrite existing keys |
 
 ### identity show
 
-ローカル identity 情報を表示します。
+Displays local identity information.
 
 ```bash
 starweft identity show [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--json` | bool | `false` | Output in JSON format |
 
-<Terminal title="例: identity を確認">
+<Terminal title="Example: Check identity">
 ```bash
 starweft identity show --json
 ```
@@ -103,30 +103,30 @@ starweft identity show --json
 
 ## peer
 
-ピアノードのアドレスと公開鍵を管理します。
+Manages peer node addresses and public keys.
 
 ### peer add
 
-ピアのマルチアドレスを登録し、discovery seeds に追加します。
+Registers a peer's multiaddress and adds it to discovery seeds.
 
 ```bash
 starweft peer add <MULTIADDR> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `<MULTIADDR>` | string | - | 必須。ピアのマルチアドレス |
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--label` | string | - | ピアのラベル (表示用) |
-| `--actor-id` | string | 自動生成 | ピアの actor ID |
-| `--node-id` | string | 自動生成 | ピアの node ID |
-| `--public-key` | string | - | ピアの公開鍵 (Base64) |
-| `--public-key-file` | path | - | ピアの公開鍵ファイル。--public-key と排他 |
-| `--stop-public-key` | string | - | ピアの stop authority 公開鍵 (Base64) |
-| `--stop-public-key-file` | path | - | ピアの stop authority 公開鍵ファイル |
-| `--capability` | string[] | - | ピアの capability (複数指定可) |
+| `<MULTIADDR>` | string | - | Required. The peer's multiaddress |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--label` | string | - | Label for the peer (for display purposes) |
+| `--actor-id` | string | auto-generated | The peer's actor ID |
+| `--node-id` | string | auto-generated | The peer's node ID |
+| `--public-key` | string | - | The peer's public key (Base64) |
+| `--public-key-file` | path | - | The peer's public key file. Mutually exclusive with --public-key |
+| `--stop-public-key` | string | - | The peer's stop authority public key (Base64) |
+| `--stop-public-key-file` | path | - | The peer's stop authority public key file |
+| `--capability` | string[] | - | The peer's capabilities (multiple can be specified) |
 
-<Terminal title="例: owner ピアを追加">
+<Terminal title="Example: Add an owner peer">
 ```bash
 starweft peer add /unix/~/.starweft-owner/mailbox.sock \
   --label owner \
@@ -136,95 +136,95 @@ starweft peer add /unix/~/.starweft-owner/mailbox.sock \
 
 ### peer list
 
-登録済みピアの一覧を表示します。
+Displays a list of registered peers.
 
 ```bash
 starweft peer list [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
 
 ---
 
 ## vision
 
-ビジョン (目標) の投入とプランニングプレビューを行います。
+Submits visions (goals) and previews planning results.
 
 ### vision submit
 
-ビジョンを owner に送信し、タスク分解を開始します。**principal ロール専用**です。
+Sends a vision to the owner and initiates task decomposition. **Principal role only.**
 
 ```bash
 starweft vision submit --title <TITLE> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--title` | string | - | 必須。ビジョンのタイトル |
-| `--text` | string | - | ビジョンのテキスト本文。--file と排他 |
-| `--file` | path | - | ビジョンテキストを読み込むファイル。--text と排他 |
-| `--constraint` | key=value[] | - | 制約条件 (複数指定可: budget_mode, human_intervention, allow_external_agents) |
-| `--owner` | string | 自動解決 | 送信先 owner の actor ID |
-| `--dry-run` | bool | `false` | プランニングプレビューのみ実行 |
-| `--approve` | TOKEN | - | プレビューで取得した approval token を指定して submit |
-| `--missing-only` | bool | `false` | --dry-run と併用。不足情報のみ表示 |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--title` | string | - | Required. Title of the vision |
+| `--text` | string | - | Text body of the vision. Mutually exclusive with --file |
+| `--file` | path | - | File to read the vision text from. Mutually exclusive with --text |
+| `--constraint` | key=value[] | - | Constraints (multiple can be specified: budget_mode, human_intervention, allow_external_agents) |
+| `--owner` | string | auto-resolved | Actor ID of the target owner |
+| `--dry-run` | bool | `false` | Run planning preview only |
+| `--approve` | TOKEN | - | Submit using the approval token obtained from the preview |
+| `--missing-only` | bool | `false` | Used with --dry-run. Display only missing information |
+| `--json` | bool | `false` | Output in JSON format |
 
 <Callout type="info">
-`human_intervention=required` の制約を持つビジョンは、先に `--dry-run` でプレビューを確認し、表示される `--approve` トークンを使って submit する必要があります。
+Visions with the `human_intervention=required` constraint must first be previewed with `--dry-run`, then submitted using the displayed `--approve` token.
 </Callout>
 
-<Terminal title="例: ビジョンを dry-run で確認してから submit">
+<Terminal title="Example: Preview a vision with dry-run, then submit">
 ```bash
-# Step 1: プレビュー
-starweft vision submit --title "新機能開発" --text "..." --dry-run
+# Step 1: Preview
+starweft vision submit --title "New feature development" --text "..." --dry-run
 
-# Step 2: approve トークンで submit
-starweft vision submit --title "新機能開発" --text "..." --approve <TOKEN>
+# Step 2: Submit with the approve token
+starweft vision submit --title "New feature development" --text "..." --approve <TOKEN>
 ```
 </Terminal>
 
 ### vision plan
 
-ビジョンのプランニングプレビューを表示します。submit は行いません。
+Displays the planning preview for a vision. Does not submit.
 
 ```bash
 starweft vision plan --title <TITLE> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--title` | string | - | 必須。ビジョンのタイトル |
-| `--text` | string | - | ビジョンのテキスト本文。--file と排他 |
-| `--file` | path | - | ビジョンテキストを読み込むファイル |
-| `--constraint` | key=value[] | - | 制約条件 (複数指定可) |
-| `--owner` | string | - | 送信先 owner の actor ID |
-| `--missing-only` | bool | `false` | 不足情報のみ表示 |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--title` | string | - | Required. Title of the vision |
+| `--text` | string | - | Text body of the vision. Mutually exclusive with --file |
+| `--file` | path | - | File to read the vision text from |
+| `--constraint` | key=value[] | - | Constraints (multiple can be specified) |
+| `--owner` | string | - | Actor ID of the target owner |
+| `--missing-only` | bool | `false` | Display only missing information |
+| `--json` | bool | `false` | Output in JSON format |
 
 ---
 
 ## status
 
-ノードのヘルス状態と統計情報を表示します。
+Displays the node's health status and statistics.
 
 ```bash
 starweft status [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--json` | bool | `false` | JSON 形式で出力 |
-| `--probe` | liveness \| readiness | - | 指定したプローブのみ実行。--watch と排他 |
-| `--watch` | bool | `false` | ウォッチモードで定期更新 |
-| `--interval-sec` | u64 | `2` | ウォッチモードの更新間隔 (秒) |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--json` | bool | `false` | Output in JSON format |
+| `--probe` | liveness \| readiness | - | Run only the specified probe. Mutually exclusive with --watch |
+| `--watch` | bool | `false` | Watch mode with periodic updates |
+| `--interval-sec` | u64 | `2` | Update interval in watch mode (seconds) |
 
-<Terminal title="例: readiness プローブを実行">
+<Terminal title="Example: Run a readiness probe">
 ```bash
 starweft status --probe readiness
 ```
@@ -234,43 +234,43 @@ starweft status --probe readiness
 
 ## snapshot
 
-プロジェクトまたはタスクのスナップショットを表示します。
+Displays a snapshot of a project or task.
 
 ```bash
 starweft snapshot [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project` | string | - | 対象プロジェクト ID |
-| `--task` | string | - | 対象タスク ID |
-| `--request` | bool | `false` | リモートノードにスナップショットをリクエスト |
-| `--owner` | string | - | リクエスト先 owner の actor ID |
-| `--watch` | bool | `false` | ウォッチモードで定期更新 |
-| `--interval-sec` | u64 | `2` | ウォッチモードの更新間隔 (秒) |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project` | string | - | Target project ID |
+| `--task` | string | - | Target task ID |
+| `--request` | bool | `false` | Request a snapshot from a remote node |
+| `--owner` | string | - | Actor ID of the owner to request from |
+| `--watch` | bool | `false` | Watch mode with periodic updates |
+| `--interval-sec` | u64 | `2` | Update interval in watch mode (seconds) |
+| `--json` | bool | `false` | Output in JSON format |
 
 ---
 
 ## logs
 
-ランタイムログを表示します。
+Displays runtime logs.
 
 ```bash
 starweft logs [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--component` | string | - | コンポーネントでフィルタ |
-| `--grep` | string | - | テキストパターンでフィルタ |
-| `--since-sec` | u64 | - | 直近 N 秒のログのみ表示 |
-| `--tail` | usize | `50` | 末尾 N 行を表示 |
-| `--follow` | bool | `false` | 新しいログを追跡表示 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--component` | string | - | Filter by component |
+| `--grep` | string | - | Filter by text pattern |
+| `--since-sec` | u64 | - | Display only logs from the last N seconds |
+| `--tail` | usize | `50` | Display the last N lines |
+| `--follow` | bool | `false` | Follow new log output |
 
-<Terminal title="例: OpenClaw コンポーネントのログを追跡">
+<Terminal title="Example: Follow OpenClaw component logs">
 ```bash
 starweft logs --component openclaw --follow
 ```
@@ -280,50 +280,50 @@ starweft logs --component openclaw --follow
 
 ## events
 
-イベントストアのタスクイベントを表示します。
+Displays task events from the event store.
 
 ```bash
 starweft events [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project` | string | - | プロジェクト ID でフィルタ |
-| `--task` | string | - | タスク ID でフィルタ |
-| `--msg-type` | string | - | メッセージタイプでフィルタ |
-| `--tail` | usize | `20` | 末尾 N 件を表示 |
-| `--follow` | bool | `false` | 新しいイベントを追跡表示 |
-| `--interval-sec` | u64 | `2` | フォロー時のポーリング間隔 (秒) |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project` | string | - | Filter by project ID |
+| `--task` | string | - | Filter by task ID |
+| `--msg-type` | string | - | Filter by message type |
+| `--tail` | usize | `20` | Display the last N entries |
+| `--follow` | bool | `false` | Follow new events |
+| `--interval-sec` | u64 | `2` | Polling interval when following (seconds) |
 
 ---
 
 ## stop
 
-プロジェクトまたはタスクツリーの停止命令を発行します。**principal ロール専用**です。
+Issues a stop order for a project or task tree. **Principal role only.**
 
 ```bash
 starweft stop --reason-code <CODE> --reason <TEXT> --yes [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project` | string | - | 停止対象のプロジェクト ID。--task-tree と排他 |
-| `--task-tree` | string | - | 停止対象のタスクツリールート ID。--project と排他 |
-| `--reason-code` | string | - | 必須。停止理由コード |
-| `--reason` | string | - | 必須。停止理由のテキスト |
-| `--yes` | bool | `false` | 必須。停止を確認 |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project` | string | - | Project ID to stop. Mutually exclusive with --task-tree |
+| `--task-tree` | string | - | Root ID of the task tree to stop. Mutually exclusive with --project |
+| `--reason-code` | string | - | Required. Stop reason code |
+| `--reason` | string | - | Required. Stop reason text |
+| `--yes` | bool | `false` | Required. Confirm the stop operation |
+| `--json` | bool | `false` | Output in JSON format |
 
 <Callout type="warning">
-`--yes` フラグなしでの実行は `[E_CONFIRMATION_REQUIRED]` エラーになります。停止は取り消しできない操作です。
+Running without the `--yes` flag results in an `[E_CONFIRMATION_REQUIRED]` error. Stop is an irreversible operation.
 </Callout>
 
-<Terminal title="例: プロジェクトを停止">
+<Terminal title="Example: Stop a project">
 ```bash
 starweft stop --project proj_01ABCDEF --reason-code user_requested \
-  --reason "目標達成のため停止" --yes
+  --reason "Stopping because the goal has been achieved" --yes
 ```
 </Terminal>
 
@@ -331,27 +331,27 @@ starweft stop --project proj_01ABCDEF --reason-code user_requested \
 
 ## wait
 
-指定した条件が満たされるまでポーリングで待機します。
+Polls until the specified condition is met.
 
 ```bash
 starweft wait [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--vision` | string | - | 対象 vision ID |
-| `--project` | string | - | 対象プロジェクト ID |
-| `--task` | string | - | 対象タスク ID |
-| `--stop` | string | - | 対象 stop ID |
-| `--until` | string | - | 待機条件 (下記参照) |
-| `--timeout-sec` | u64 | `120` | タイムアウト (秒) |
-| `--interval-ms` | u64 | `500` | ポーリング間隔 (ミリ秒) |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--vision` | string | - | Target vision ID |
+| `--project` | string | - | Target project ID |
+| `--task` | string | - | Target task ID |
+| `--stop` | string | - | Target stop ID |
+| `--until` | string | - | Wait condition (see below) |
+| `--timeout-sec` | u64 | `120` | Timeout (seconds) |
+| `--interval-ms` | u64 | `500` | Polling interval (milliseconds) |
+| `--json` | bool | `false` | Output in JSON format |
 
-`--until` に指定できる値はスコープによって異なります。
+The valid values for `--until` depend on the scope.
 
-<Accordion title="--until の有効な値">
+<Accordion title="Valid values for --until">
 
 - **`--vision`**: `project_created`, `active`, `stopped`
 - **`--project`**: `available`, `active`, `approval_applied`, `stopping`, `stopped`
@@ -360,115 +360,115 @@ starweft wait [OPTIONS]
 </Accordion>
 
 <Callout type="info">
-`--vision`, `--project`, `--task`, `--stop` はいずれか 1 つだけ指定してください。
+Specify only one of `--vision`, `--project`, `--task`, or `--stop`.
 </Callout>
 
 ---
 
 ## project
 
-プロジェクトの一覧表示と承認を行います。
+Lists and approves projects.
 
 ### project list
 
-プロジェクト一覧を表示します。
+Displays a list of projects.
 
 ```bash
 starweft project list [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--status` | string | - | ステータスでフィルタ |
-| `--approval-state` | string | - | 承認状態でフィルタ |
-| `--owner` | string | - | owner actor ID でフィルタ |
-| `--principal` | string | - | principal actor ID でフィルタ |
-| `--updated-since` | RFC3339 | - | 指定日時以降に更新されたプロジェクトのみ |
-| `--limit` | usize | - | 表示件数の上限 |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--status` | string | - | Filter by status |
+| `--approval-state` | string | - | Filter by approval state |
+| `--owner` | string | - | Filter by owner actor ID |
+| `--principal` | string | - | Filter by principal actor ID |
+| `--updated-since` | RFC3339 | - | Show only projects updated since the specified date |
+| `--limit` | usize | - | Maximum number of entries to display |
+| `--json` | bool | `false` | Output in JSON format |
 
 ### project approve
 
-プロジェクトの実行を承認します。**owner または principal ロール**で実行できます。
+Approves a project for execution. Can be run with the **owner or principal role**.
 
 ```bash
 starweft project approve --project <ID> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project` | string | - | 必須。承認対象のプロジェクト ID |
-| `--owner` | string | - | owner の actor ID |
-| `--wait` | bool | `false` | 承認適用まで待機 |
-| `--timeout-sec` | u64 | `120` | 待機タイムアウト (秒) |
-| `--interval-ms` | u64 | `500` | ポーリング間隔 (ミリ秒) |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project` | string | - | Required. Project ID to approve |
+| `--owner` | string | - | Owner's actor ID |
+| `--wait` | bool | `false` | Wait until the approval is applied |
+| `--timeout-sec` | u64 | `120` | Wait timeout (seconds) |
+| `--interval-ms` | u64 | `500` | Polling interval (milliseconds) |
+| `--json` | bool | `false` | Output in JSON format |
 
 ---
 
 ## task
 
-タスクの一覧表示、ツリー表示、承認を行います。
+Lists, displays tree views, and approves tasks.
 
 ### task list
 
-タスク一覧を表示します。
+Displays a list of tasks.
 
 ```bash
 starweft task list [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project` | string | - | プロジェクト ID でフィルタ |
-| `--status` | string | - | ステータスでフィルタ |
-| `--approval-state` | string | - | 承認状態でフィルタ |
-| `--assignee` | string | - | 担当者 actor ID でフィルタ |
-| `--updated-since` | RFC3339 | - | 指定日時以降に更新されたタスクのみ |
-| `--limit` | usize | - | 表示件数の上限 |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project` | string | - | Filter by project ID |
+| `--status` | string | - | Filter by status |
+| `--approval-state` | string | - | Filter by approval state |
+| `--assignee` | string | - | Filter by assignee actor ID |
+| `--updated-since` | RFC3339 | - | Show only tasks updated since the specified date |
+| `--limit` | usize | - | Maximum number of entries to display |
+| `--json` | bool | `false` | Output in JSON format |
 
 ### task tree
 
-タスクの階層構造をツリー表示します。
+Displays the task hierarchy as a tree.
 
 ```bash
 starweft task tree --project <ID> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project` | string | - | 必須。プロジェクト ID |
-| `--root` | string | - | ツリーのルートとなるタスク ID |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project` | string | - | Required. Project ID |
+| `--root` | string | - | Task ID to use as the tree root |
+| `--json` | bool | `false` | Output in JSON format |
 
 ### task approve
 
-タスクの実行を承認します。**owner または principal ロール**で実行できます。
+Approves a task for execution. Can be run with the **owner or principal role**.
 
 ```bash
 starweft task approve --task <ID> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--task` | string | - | 必須。承認対象のタスク ID |
-| `--owner` | string | - | owner の actor ID |
-| `--wait` | bool | `false` | 承認適用まで待機 |
-| `--timeout-sec` | u64 | `120` | 待機タイムアウト (秒) |
-| `--interval-ms` | u64 | `500` | ポーリング間隔 (ミリ秒) |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--task` | string | - | Required. Task ID to approve |
+| `--owner` | string | - | Owner's actor ID |
+| `--wait` | bool | `false` | Wait until the approval is applied |
+| `--timeout-sec` | u64 | `120` | Wait timeout (seconds) |
+| `--interval-ms` | u64 | `500` | Polling interval (milliseconds) |
+| `--json` | bool | `false` | Output in JSON format |
 
 ---
 
 ## export
 
-プロジェクト・タスクのデータを JSON または Markdown でエクスポートします。
+Exports project and task data in JSON or Markdown format.
 
 ### export project
 
@@ -494,124 +494,124 @@ starweft export evaluation --project <ID> [OPTIONS]
 starweft export artifacts --project <ID> [OPTIONS]
 ```
 
-各サブコマンド共通のフラグは以下です。
+The following flags are shared across all subcommands.
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project / --task` | string | - | 必須。対象のプロジェクト ID またはタスク ID |
-| `--format` | json \| markdown | `json` | 出力フォーマット |
-| `--output` | path | - | 出力先ファイルパス (省略時は stdout) |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project / --task` | string | - | Required. Target project ID or task ID |
+| `--format` | json \| markdown | `json` | Output format |
+| `--output` | path | - | Output file path (defaults to stdout if omitted) |
 
 ---
 
 ## publish
 
-エクスポートデータを外部サービスに公開します。
+Publishes export data to external services.
 
 ### publish context
 
-パブリッシュ用のコンテキストデータを生成します。
+Generates context data for publishing.
 
 ```bash
 starweft publish context [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project` | string | - | プロジェクト ID。--task と排他 |
-| `--task` | string | - | タスク ID。--project と排他 |
-| `--format` | json \| markdown | `json` | 出力フォーマット |
-| `--output` | path | - | 出力先ファイルパス |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project` | string | - | Project ID. Mutually exclusive with --task |
+| `--task` | string | - | Task ID. Mutually exclusive with --project |
+| `--format` | json \| markdown | `json` | Output format |
+| `--output` | path | - | Output file path |
 
 ### publish dry-run
 
-パブリッシュのドライランを実行し、プレビューを生成します。
+Runs a dry run of the publish and generates a preview.
 
 ```bash
 starweft publish dry-run [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project` | string | - | プロジェクト ID。--task と排他 |
-| `--task` | string | - | タスク ID。--project と排他 |
-| `--target` | string | `issue` | ターゲット種別 |
-| `--title` | string | 自動生成 | パブリッシュのタイトル |
-| `--output` | path | - | 出力先ファイルパス |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project` | string | - | Project ID. Mutually exclusive with --task |
+| `--task` | string | - | Task ID. Mutually exclusive with --project |
+| `--target` | string | `issue` | Target type |
+| `--title` | string | auto-generated | Title for the publish |
+| `--output` | path | - | Output file path |
 
 ### publish github
 
-GitHub の Issue または Pull Request にコメントを投稿します。
+Posts a comment to a GitHub Issue or Pull Request.
 
 ```bash
 starweft publish github --repo <OWNER/REPO> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--project` | string | - | プロジェクト ID。--task と排他 |
-| `--task` | string | - | タスク ID。--project と排他 |
-| `--repo` | string | - | 必須。owner/repo 形式のリポジトリ指定 |
-| `--issue` | u64 | - | Issue 番号。--pr と排他 |
-| `--pr` | u64 | - | Pull Request 番号。--issue と排他 |
-| `--title` | string | 自動生成 | コメントのタイトル |
-| `--output` | path | - | 結果 JSON の出力先ファイル |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--project` | string | - | Project ID. Mutually exclusive with --task |
+| `--task` | string | - | Task ID. Mutually exclusive with --project |
+| `--repo` | string | - | Required. Repository in owner/repo format |
+| `--issue` | u64 | - | Issue number. Mutually exclusive with --pr |
+| `--pr` | u64 | - | Pull Request number. Mutually exclusive with --issue |
+| `--title` | string | auto-generated | Title for the comment |
+| `--output` | path | - | Output file path for the result JSON |
 
 <Callout type="info">
-GitHub トークンの設定については[環境変数リファレンス](/docs/reference/env-vars)を参照してください。
+See the [Environment Variables reference](/docs/reference/env-vars) for configuring GitHub tokens.
 </Callout>
 
 ---
 
 ## backup
 
-ノードの全データのバックアップと復元を行います。
+Backs up and restores all node data.
 
 ### backup create
 
-データディレクトリを署名付きバンドルとしてバックアップします。
+Backs up the data directory as a signed bundle.
 
 ```bash
 starweft backup create --output <PATH> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--output` | path | - | 必須。バックアップ出力先ディレクトリ |
-| `--force` | bool | `false` | 既存の出力先を上書き |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--output` | path | - | Required. Backup output directory |
+| `--force` | bool | `false` | Overwrite existing output |
 
 ### backup restore
 
-バックアップバンドルからデータを復元します。
+Restores data from a backup bundle.
 
 ```bash
 starweft backup restore --input <PATH> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | 復元先データディレクトリのパス |
-| `--input` | path | - | 必須。バックアップバンドルのパス |
-| `--force` | bool | `false` | identity 不一致でも強制復元 |
+| `--data-dir` | path | `~/.starweft` | Path to the restore destination data directory |
+| `--input` | path | - | Required. Path to the backup bundle |
+| `--force` | bool | `false` | Force restore even if identities do not match |
 
 <Callout type="warning">
-異なるノードのバックアップを復元する場合は `--force` が必要です。identity の不一致が検出されると `[E_BACKUP_IDENTITY_MISMATCH]` エラーになります。
+Restoring a backup from a different node requires the `--force` flag. An `[E_BACKUP_IDENTITY_MISMATCH]` error is raised when an identity mismatch is detected.
 </Callout>
 
 ---
 
 ## repair
 
-データの修復操作を行います。
+Performs data repair operations.
 
 ### repair rebuild-projections
 
-タスクイベントログからプロジェクション (プロジェクト・タスクのスナップショット) を再構築します。
+Rebuilds projections (project and task snapshots) from the task event log.
 
 ```bash
 starweft repair rebuild-projections [--data-dir <PATH>]
@@ -619,7 +619,7 @@ starweft repair rebuild-projections [--data-dir <PATH>]
 
 ### repair resume-outbox
 
-pending 状態の outbox メッセージを再キューします。
+Re-queues outbox messages that are in a pending state.
 
 ```bash
 starweft repair resume-outbox [--data-dir <PATH>]
@@ -627,21 +627,21 @@ starweft repair resume-outbox [--data-dir <PATH>]
 
 ### repair list-dead-letters
 
-配送不能メッセージ (dead letters) を一覧表示します。
+Lists undeliverable messages (dead letters).
 
 ```bash
 starweft repair list-dead-letters [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--limit` | usize | `20` | 表示件数の上限 |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--limit` | usize | `20` | Maximum number of entries to display |
+| `--json` | bool | `false` | Output in JSON format |
 
 ### repair reconcile-running-tasks
 
-ランタイム停止後に running 状態のまま残ったタスクを停止状態に修正します。
+Transitions tasks that remain in the running state after a runtime shutdown to a stopped state.
 
 ```bash
 starweft repair reconcile-running-tasks [--data-dir <PATH>]
@@ -651,43 +651,43 @@ starweft repair reconcile-running-tasks [--data-dir <PATH>]
 
 ## audit
 
-イベントログの整合性を検証します。
+Verifies the integrity of the event log.
 
 ### audit verify-log
 
-タスクイベントログの署名・ハッシュ・Lamport タイムスタンプの整合性を検証します。
+Verifies the integrity of signatures, hashes, and Lamport timestamps in the task event log.
 
 ```bash
 starweft audit verify-log [--data-dir <PATH>]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
 
 ---
 
 ## openclaw
 
-OpenClaw バイナリの設定を管理します。
+Manages the OpenClaw binary configuration.
 
 ### openclaw attach
 
-OpenClaw バイナリのパスと設定を `config.toml` に書き込みます。
+Writes the OpenClaw binary path and settings to `config.toml`.
 
 ```bash
 starweft openclaw attach --bin <PATH> [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--bin` | string | - | 必須。OpenClaw バイナリのパスまたはコマンド名 |
-| `--working-dir` | path | - | OpenClaw の作業ディレクトリ |
-| `--timeout-sec` | u64 | - | タスク実行タイムアウト (秒) |
-| `--enable` | bool | `false` | openclaw.enabled を true に設定 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--bin` | string | - | Required. Path or command name of the OpenClaw binary |
+| `--working-dir` | path | - | Working directory for OpenClaw |
+| `--timeout-sec` | u64 | - | Task execution timeout (seconds) |
+| `--enable` | bool | `false` | Set openclaw.enabled to true |
 
-<Terminal title="例: OpenClaw をアタッチして有効化">
+<Terminal title="Example: Attach and enable OpenClaw">
 ```bash
 starweft openclaw attach --bin /usr/local/bin/openclaw --enable
 ```
@@ -697,107 +697,107 @@ starweft openclaw attach --bin /usr/local/bin/openclaw --enable
 
 ## config
 
-設定ファイルの表示と検証を行います。
+Displays and validates the configuration file.
 
 ### config show
 
-現在の設定を表示します (秘密情報はマスクされます)。
+Displays the current configuration (sensitive information is masked).
 
 ```bash
 starweft config show [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--json` | bool | `false` | JSON 形式で出力 (デフォルトは TOML) |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--json` | bool | `false` | Output in JSON format (default is TOML) |
 
 ### config validate
 
-設定ファイルの整合性を検証し、警告とエラーを報告します。
+Validates the configuration file for consistency and reports warnings and errors.
 
 ```bash
 starweft config validate [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--json` | bool | `false` | JSON 形式で出力 |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--json` | bool | `false` | Output in JSON format |
 
 ---
 
 ## registry serve
 
-ピアディスカバリ用の HTTP レジストリサーバーを起動します。
+Starts an HTTP registry server for peer discovery.
 
 ```bash
 starweft registry serve [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--bind` | string | `127.0.0.1:7777` | バインドアドレス |
-| `--ttl-sec` | u64 | `300` | ピアエントリの TTL (秒) |
-| `--rate-limit-window-sec` | u64 | `60` | レートリミットウィンドウ (秒) |
-| `--announce-rate-limit` | u64 | `300` | announce エンドポイントのレートリミット |
-| `--peers-rate-limit` | u64 | `900` | peers エンドポイントのレートリミット |
-| `--shared-secret` | string | - | HMAC 認証用の共有シークレット (STARWEFT_REGISTRY_SHARED_SECRET 環境変数も可) |
-| `--shared-secret-env` | string | - | 共有シークレットを格納する環境変数名 |
-| `--max-body-bytes` | usize | `65536` | リクエストボディの最大サイズ (bytes) |
-| `--read-timeout-ms` | u64 | `5000` | 読み取りタイムアウト (ms) |
-| `--write-timeout-ms` | u64 | `5000` | 書き込みタイムアウト (ms) |
-| `--allow-insecure-no-auth` | bool | `false` | 認証なしでの非ループバックバインドを許可 (非推奨) |
+| `--bind` | string | `127.0.0.1:7777` | Bind address |
+| `--ttl-sec` | u64 | `300` | TTL for peer entries (seconds) |
+| `--rate-limit-window-sec` | u64 | `60` | Rate limit window (seconds) |
+| `--announce-rate-limit` | u64 | `300` | Rate limit for the announce endpoint |
+| `--peers-rate-limit` | u64 | `900` | Rate limit for the peers endpoint |
+| `--shared-secret` | string | - | Shared secret for HMAC authentication (can also use STARWEFT_REGISTRY_SHARED_SECRET environment variable) |
+| `--shared-secret-env` | string | - | Name of the environment variable containing the shared secret |
+| `--max-body-bytes` | usize | `65536` | Maximum request body size (bytes) |
+| `--read-timeout-ms` | u64 | `5000` | Read timeout (ms) |
+| `--write-timeout-ms` | u64 | `5000` | Write timeout (ms) |
+| `--allow-insecure-no-auth` | bool | `false` | Allow binding to non-loopback addresses without authentication (not recommended) |
 
 <Callout type="warning">
-非ループバックアドレスにバインドする場合、`--shared-secret` または `--shared-secret-env` が必須です。テスト目的でのみ `--allow-insecure-no-auth` を使用してください。
+When binding to a non-loopback address, `--shared-secret` or `--shared-secret-env` is required. Use `--allow-insecure-no-auth` only for testing purposes.
 </Callout>
 
 ---
 
 ## metrics
 
-ノードのメトリクスを Prometheus テキスト形式または JSON で出力します。
+Outputs node metrics in Prometheus text format or JSON.
 
 ```bash
 starweft metrics [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--format` | prometheus \| json | `prometheus` | 出力フォーマット |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--format` | prometheus \| json | `prometheus` | Output format |
 
 ---
 
 ## dashboard
 
-TUI ダッシュボードをリアルタイムで表示します。
+Displays a real-time TUI dashboard.
 
 ```bash
 starweft dashboard [OPTIONS]
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `--data-dir` | path | `~/.starweft` | データディレクトリのパス |
-| `--interval-ms` | u64 | `1000` | リフレッシュ間隔 (ミリ秒) |
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--interval-ms` | u64 | `1000` | Refresh interval (milliseconds) |
 
 ---
 
 ## completions
 
-シェル補完スクリプトを生成します。
+Generates shell completion scripts.
 
 ```bash
 starweft completions <SHELL>
 ```
 
-| フラグ | 型 | デフォルト | 説明 |
+| Flag | Type | Default | Description |
 |-------|-----|-----------|------|
-| `<SHELL>` | bash \| zsh \| fish \| powershell \| elvish | - | 必須。対象シェル |
+| `<SHELL>` | bash \| zsh \| fish \| powershell \| elvish | - | Required. Target shell |
 
-<Terminal title="例: zsh 補完を設定">
+<Terminal title="Example: Set up zsh completions">
 ```bash
 starweft completions zsh > ~/.zfunc/_starweft
 ```

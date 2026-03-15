@@ -3,102 +3,102 @@ title: "Your First Vision"
 description: "A step-by-step guide to submitting and tracking your first vision."
 ---
 
-このガイドでは、Starweft で最初のビジョンを投入し、タスクの分解・実行・評価までの一連の流れを体験します。
+This guide walks you through submitting your first vision in Starweft and experiencing the full workflow of task decomposition, execution, and evaluation.
 
-## 前提条件
+## Prerequisites
 
-以下の準備が完了していることを確認してください。
+Make sure the following preparations are complete.
 
-- principal、owner、worker の各ノードが `starweft init` で初期化済み
-- 各ノードで `starweft identity create` による Ed25519 ID が作成済み
-- `starweft peer add` で相互にピア登録済み
+- Principal, owner, and worker nodes have been initialized with `starweft init`
+- Ed25519 identities have been created on each node with `starweft identity create`
+- Peers have been mutually registered with `starweft peer add`
 
 <Callout type="tip">
-  まだセットアップが済んでいない場合は、先に [Quick Start](/docs/getting-started/quick-start) を完了してください。
+  If you haven't completed the setup yet, please finish the [Quick Start](/docs/getting-started/quick-start) first.
 </Callout>
 
-## Vision の投入
+## Submitting a Vision
 
 <Steps>
 
 <div>
 
-**ビジョンテキストを準備する**
+**Prepare the vision text**
 
-ビジョンは、達成したい目標を自然言語で記述したものです。タスク分解の精度を上げるために、以下を含めることを推奨します。
+A vision is a natural language description of the goal you want to achieve. To improve task decomposition accuracy, it is recommended to include:
 
-- 具体的な成果物
-- 受け入れ基準（acceptance criteria）
-- リスクや制約条件
+- Specific deliverables
+- Acceptance criteria
+- Risks and constraints
 
 </div>
 
 <div>
 
-**`vision plan` でプレビューする**
+**Preview with `vision plan`**
 
-実際に投入する前に、プラン（タスク分解計画）をプレビューできます。
+Before actually submitting, you can preview the plan (task decomposition plan).
 
 ```bash
 starweft vision plan \
   --data-dir ./demo/principal \
-  --title "REST API の構築" \
-  --text "Rust で Hello World REST API を構築する。GET /health エンドポイントを含め、テストで動作を検証すること。"
+  --title "Build a REST API" \
+  --text "Build a Hello World REST API in Rust. Include a GET /health endpoint and verify behavior with tests."
 ```
 
-プレビューには以下の情報が含まれます。
+The preview includes the following information:
 
-- **task_count** — 分解されるタスク数
-- **confidence** — プラン品質の信頼度スコア（0.0〜1.0）
-- **planning_risk** — リスク評価（low / medium / high）
-- **missing_information** — 不足している情報の一覧
-- **approval_token** — 承認用トークン
+- **task_count** — Number of tasks the vision will be decomposed into
+- **confidence** — Confidence score for plan quality (0.0 to 1.0)
+- **planning_risk** — Risk assessment (low / medium / high)
+- **missing_information** — List of missing information
+- **approval_token** — Token for approval
 
 </div>
 
 <div>
 
-**制約条件を追加する（推奨）**
+**Add constraints (recommended)**
 
-`--constraint` フラグで制約条件を指定すると、信頼度スコアが向上します。
+Specifying constraints with the `--constraint` flag improves the confidence score.
 
 ```bash
 starweft vision plan \
   --data-dir ./demo/principal \
-  --title "REST API の構築" \
-  --text "Rust で Hello World REST API を構築する。GET /health エンドポイントを含め、テストで動作を検証すること。" \
+  --title "Build a REST API" \
+  --text "Build a Hello World REST API in Rust. Include a GET /health endpoint and verify behavior with tests." \
   --constraint budget_mode=balanced \
   --constraint allow_external_agents=true \
   --constraint human_intervention=required
 ```
 
-主要な制約条件:
+Key constraints:
 
-| 制約 | 説明 | 推奨値 |
-|------|------|--------|
-| `budget_mode` | 実行コストの方針 | `balanced` |
-| `allow_external_agents` | 外部エージェントの利用可否 | `true` |
-| `human_intervention` | 人間の承認要否 | `required` |
+| Constraint | Description | Recommended Value |
+|------------|-------------|-------------------|
+| `budget_mode` | Execution cost policy | `balanced` |
+| `allow_external_agents` | Whether external agents are allowed | `true` |
+| `human_intervention` | Whether human approval is required | `required` |
 
 </div>
 
 <div>
 
-**`vision submit` で投入する**
+**Submit with `vision submit`**
 
-プレビューの内容に問題がなければ、ビジョンを投入します。
+If the preview looks good, submit the vision.
 
 ```bash
 starweft vision submit \
   --data-dir ./demo/principal \
-  --title "REST API の構築" \
-  --text "Rust で Hello World REST API を構築する。GET /health エンドポイントを含め、テストで動作を検証すること。" \
+  --title "Build a REST API" \
+  --text "Build a Hello World REST API in Rust. Include a GET /health endpoint and verify behavior with tests." \
   --constraint budget_mode=balanced \
   --constraint allow_external_agents=true \
   --constraint human_intervention=required
 ```
 
-成功すると `vision_id` と `msg_id` が出力されます。
+On success, a `vision_id` and `msg_id` are output.
 
 ```
 vision_id: 01J...
@@ -110,37 +110,37 @@ owner_actor_id: actor_...
 
 </Steps>
 
-## 承認付き投入
+## Submission with Approval
 
-`human_intervention=required` を指定した場合、投入前に承認トークンが必要です。
+When `human_intervention=required` is specified, an approval token is required before submission.
 
 <Steps>
 
 <div>
 
-**プレビューで承認トークンを取得する**
+**Obtain the approval token via preview**
 
 ```bash
 starweft vision submit \
   --data-dir ./demo/principal \
-  --title "REST API の構築" \
+  --title "Build a REST API" \
   --text "..." \
   --constraint human_intervention=required \
   --dry-run
 ```
 
-出力に含まれる `approval_token` と `approval_command` を確認します。
+Check the `approval_token` and `approval_command` in the output.
 
 </div>
 
 <div>
 
-**承認トークン付きで投入する**
+**Submit with the approval token**
 
 ```bash
 starweft vision submit \
   --data-dir ./demo/principal \
-  --title "REST API の構築" \
+  --title "Build a REST API" \
   --text "..." \
   --constraint human_intervention=required \
   --approve <APPROVAL_TOKEN>
@@ -151,170 +151,170 @@ starweft vision submit \
 </Steps>
 
 <Callout type="warning">
-  承認トークンはプレビュー内容のハッシュ値です。ビジョンテキストや制約を変更すると無効になるため、再度 `--dry-run` で取得し直してください。
+  The approval token is a hash of the preview content. It becomes invalid if you change the vision text or constraints, so you will need to obtain a new one with `--dry-run`.
 </Callout>
 
-## 進捗のモニタリング
+## Monitoring Progress
 
-ビジョンが投入され、ノードが稼働すると、owner がタスク分解を行い worker に配布します。
+Once the vision is submitted and nodes are running, the owner decomposes tasks and distributes them to workers.
 
-### ノードの稼働状態を確認する
+### Check node status
 
 ```bash
 starweft status --data-dir ./demo/principal
 ```
 
-`--watch` フラグでリアルタイム監視が可能です。
+Use the `--watch` flag for real-time monitoring.
 
 ```bash
 starweft status --data-dir ./demo/owner --watch --interval-sec 3
 ```
 
-### プロジェクト一覧を確認する
+### View the project list
 
-ビジョンは owner ノード上で「プロジェクト」として管理されます。
+Visions are managed as "projects" on the owner node.
 
 ```bash
 starweft project list --data-dir ./demo/owner
 ```
 
-ステータスでフィルタリングもできます。
+You can also filter by status.
 
 ```bash
 starweft project list --data-dir ./demo/owner --status active
 ```
 
-### タスクツリーを確認する
+### View the task tree
 
-プロジェクト配下のタスク構造をツリー形式で表示します。
+Display the task structure under a project in tree format.
 
 ```bash
 starweft task tree --data-dir ./demo/owner --project <PROJECT_ID>
 ```
 
-### タスク一覧を確認する
+### View the task list
 
-フラットなタスク一覧を表示します。フィルタ条件も指定できます。
+Display a flat task list. Filter conditions can also be specified.
 
 ```bash
 starweft task list --data-dir ./demo/owner --project <PROJECT_ID>
 starweft task list --data-dir ./demo/owner --status running
 ```
 
-### スナップショットを取得する
+### Retrieve a snapshot
 
-特定のプロジェクトやタスクの詳細スナップショットを取得します。
+Retrieve a detailed snapshot of a specific project or task.
 
 ```bash
 starweft snapshot --data-dir ./demo/owner --project <PROJECT_ID>
 ```
 
-`--watch` で定期的に更新を確認できます。
+Use `--watch` to periodically check for updates.
 
 ```bash
 starweft snapshot --data-dir ./demo/owner --project <PROJECT_ID> --watch
 ```
 
-### イベントログを確認する
+### View the event log
 
-メッセージ交換の履歴を時系列で確認できます。
+View the history of message exchanges in chronological order.
 
 ```bash
 starweft events --data-dir ./demo/owner --project <PROJECT_ID> --tail 30
 ```
 
-`--follow` フラグでリアルタイムにイベントを追跡できます。
+Use the `--follow` flag to track events in real time.
 
 ```bash
 starweft events --data-dir ./demo/owner --follow
 ```
 
-### TUI ダッシュボード
+### TUI Dashboard
 
-リアルタイムのステータスを TUI で確認できます。
+View real-time status in a TUI dashboard.
 
 ```bash
 starweft dashboard --data-dir ./demo/owner
 ```
 
-## 結果の確認と評価
+## Reviewing Results and Evaluation
 
-### 評価結果の確認
+### Viewing evaluation results
 
-タスクが完了すると、owner ノードがヒューリスティック評価を実施します。評価結果はイベントログに記録されます。
+When a task completes, the owner node performs a heuristic evaluation. Evaluation results are recorded in the event log.
 
 ```bash
 starweft events --data-dir ./demo/owner --msg-type evaluation_issued
 ```
 
-### 成果物のエクスポート
+### Exporting artifacts
 
-プロジェクトやタスクの結果を JSON で書き出せます。
+You can export project or task results as JSON.
 
 ```bash
-# プロジェクト全体
+# Entire project
 starweft export project --data-dir ./demo/owner --project <PROJECT_ID>
 
-# 特定タスク
+# Specific task
 starweft export task --data-dir ./demo/owner --task <TASK_ID>
 
-# 評価結果
+# Evaluation results
 starweft export evaluation --data-dir ./demo/owner --project <PROJECT_ID>
 ```
 
-`--output` でファイルに保存できます。
+Use `--output` to save to a file.
 
 ```bash
 starweft export project --data-dir ./demo/owner --project <PROJECT_ID> --output result.json
 ```
 
-## 停止制御
+## Stop Control
 
-プロジェクトやタスクツリーの実行を停止するには、principal ノードから `stop` コマンドを使用します。
+To stop the execution of a project or task tree, use the `stop` command from the principal node.
 
 ```bash
 starweft stop \
   --data-dir ./demo/principal \
   --project <PROJECT_ID> \
   --reason-code user_request \
-  --reason "目標達成のため停止" \
+  --reason "Stopping because the goal has been achieved" \
   --yes
 ```
 
-特定のタスクツリーのみ停止する場合:
+To stop only a specific task tree:
 
 ```bash
 starweft stop \
   --data-dir ./demo/principal \
   --task-tree <TASK_ID> \
   --reason-code user_request \
-  --reason "このタスクは不要" \
+  --reason "This task is no longer needed" \
   --yes
 ```
 
-## ファイルからビジョンを読み込む
+## Loading a Vision from a File
 
-長いビジョンテキストはファイルから読み込めます。
+Long vision texts can be loaded from a file.
 
 ```bash
 starweft vision submit \
   --data-dir ./demo/principal \
-  --title "大規模リファクタリング" \
+  --title "Large-scale refactoring" \
   --file ./vision.txt \
   --constraint human_intervention=required
 ```
 
-## JSON 出力
+## JSON Output
 
-すべてのコマンドは `--json` フラグで機械可読な JSON を出力します。スクリプトからの利用に便利です。
+All commands support the `--json` flag for machine-readable JSON output. This is useful when calling from scripts.
 
 ```bash
 starweft vision plan --data-dir ./demo/principal \
-  --title "テスト" --text "テスト用ビジョン" --json
+  --title "Test" --text "Test vision" --json
 ```
 
-## 次のステップ
+## Next Steps
 
-<LinkCard href="/docs/guides/openclaw" title="OpenClaw 統合" description="Worker ノードに OpenClaw を接続してタスクを自動実行する" />
-<LinkCard href="/docs/guides/config" title="設定ガイド" description="TOML 設定ファイルで動作をカスタマイズする" />
-<LinkCard href="/docs/guides/multi-machine" title="マルチマシン構成" description="複数マシンにまたがるノード構成を構築する" />
+<LinkCard href="/docs/guides/openclaw" title="OpenClaw Integration" description="Connect OpenClaw to a Worker node to automatically execute tasks" />
+<LinkCard href="/docs/guides/config" title="Configuration Guide" description="Customize behavior with TOML configuration files" />
+<LinkCard href="/docs/guides/multi-machine" title="Multi-Machine Setup" description="Build node configurations spanning multiple machines" />

@@ -3,38 +3,38 @@ title: "Audit"
 description: "Verify event store integrity with signature and tamper detection."
 ---
 
-## 概要
+## Overview
 
-Starweft のすべてのプロトコルメッセージは **イベントソーシング**方式で SQLite データベースに記録されます。`audit verify-log` コマンドは、このイベントログの**完全性**と**署名の正当性**を検証し、改ざんや破損を検出します。
+All Starweft protocol messages are recorded in a SQLite database using an **event sourcing** approach. The `audit verify-log` command verifies the **integrity** and **signature validity** of this event log, detecting tampering and corruption.
 
 ## audit verify-log
 
-### 実行方法
+### Usage
 
 ```bash
 starweft audit verify-log
 ```
 
 <Callout type="info">
-`--data-dir` オプションでデータディレクトリを指定できます。省略時はデフォルト（Unix: `~/.starweft`、Windows: `%LOCALAPPDATA%\starweft`）が使用されます。
+The `--data-dir` option can be used to specify the data directory. When omitted, the default is used (Unix: `~/.starweft`, Windows: `%LOCALAPPDATA%\starweft`).
 </Callout>
 
-### 検査項目
+### Inspection Items
 
-`audit verify-log` は以下の項目を検査します。
+`audit verify-log` inspects the following items.
 
-| 検査項目 | 説明 |
+| Inspection Item | Description |
 |---------|------|
-| raw JSON 整合性 | 保存された生 JSON (raw_json) とデータベースカラムに分解された値が一致するか検証。改ざんの直接的な検出手段。 |
-| Ed25519 署名検証 | 生 JSON に対して送信者の公開鍵で Ed25519 署名を再検証。鍵が不明な場合は unverifiable として報告。 |
-| task_id の存在 | TaskDelegated / TaskProgress / TaskResultSubmitted イベントに task_id が設定されているか確認。 |
-| ProjectCharter 重複 | 同一 project_id に対する ProjectCharter が複数存在しないか確認。 |
-| Lamport タイムスタンプ | 同一プロジェクト内で Lamport タイムスタンプが単調増加しているか確認。回帰はイベント順序の不整合を示す。 |
-| JSON パース | イベントの構造体デシリアライズが正常に完了するか確認。 |
+| Raw JSON integrity | Verifies that the stored raw JSON (raw_json) matches the values decomposed into database columns. This is a direct method for detecting tampering. |
+| Ed25519 signature verification | Re-verifies the Ed25519 signature against the raw JSON using the sender's public key. Events with unknown keys are reported as unverifiable. |
+| task_id presence | Confirms that task_id is set on TaskDelegated / TaskProgress / TaskResultSubmitted events. |
+| ProjectCharter duplication | Confirms that multiple ProjectCharter entries do not exist for the same project_id. |
+| Lamport timestamp | Confirms that Lamport timestamps are monotonically increasing within the same project. Regression indicates event ordering inconsistency. |
+| JSON parsing | Confirms that struct deserialization of the event completes successfully. |
 
-### 出力の読み方
+### Reading the Output
 
-<Terminal title="正常時の出力例">
+<Terminal title="Example output when healthy">
 ```
 checked_events: 42
 invalid_events: 0
@@ -45,7 +45,7 @@ audit: ok
 ```
 </Terminal>
 
-<Terminal title="異常検出時の出力例">
+<Terminal title="Example output when issues are detected">
 ```
 checked_events: 42
 invalid_events: 2
@@ -54,55 +54,55 @@ raw_json_mismatches: 1
 unverifiable_signatures: 3
 error: msg_01ABC...: signature verification failed
 error: msg_01DEF...: raw_json mismatch for field lamport_ts
-[E_AUDIT_FAILED] task_events に不整合があります
+[E_AUDIT_FAILED] Inconsistencies found in task_events
 ```
 </Terminal>
 
-### 出力フィールドの意味
+### Output Field Definitions
 
-| フィールド | 意味 |
+| Field | Meaning |
 |---|---|
-| `checked_events` | 検査したイベントの総数 |
-| `invalid_events` | 問題が検出されたイベント数（署名失敗 + raw JSON 不一致 + 構造不正 + 重複 + Lamport 回帰 + task_id 欠落の合計） |
-| `signature_failures` | Ed25519 署名の検証に失敗したイベント数 |
-| `raw_json_mismatches` | 生 JSON とカラム値が不一致のイベント数 |
-| `unverifiable_signatures` | 公開鍵が不明または `raw_json` が未保存で署名検証をスキップしたイベント数 |
+| `checked_events` | Total number of events inspected |
+| `invalid_events` | Number of events with detected issues (sum of signature failures + raw JSON mismatches + structural errors + duplicates + Lamport regressions + missing task_ids) |
+| `signature_failures` | Number of events that failed Ed25519 signature verification |
+| `raw_json_mismatches` | Number of events where the raw JSON and column values do not match |
+| `unverifiable_signatures` | Number of events where signature verification was skipped because the public key is unknown or `raw_json` was not stored |
 
 <Callout type="warning">
-`unverifiable_signatures` が 0 でない場合、対象イベントの署名は検証されていません。これは必ずしも改ざんを意味しませんが、`peer add` で該当ピアの公開鍵を登録すれば検証可能になります。
+If `unverifiable_signatures` is non-zero, the signatures for those events have not been verified. This does not necessarily indicate tampering, but registering the relevant peer's public key via `peer add` will make verification possible.
 </Callout>
 
-## 問題が検出された場合の対処
+## Handling Detected Issues
 
-### signature_failures / raw_json_mismatches が検出された場合
+### When signature_failures / raw_json_mismatches Are Detected
 
-イベントデータが改ざんされた可能性があります。
+Event data may have been tampered with.
 
-1. **バックアップからの復元**を検討してください（後述の `backup restore`）
-2. プロジェクション（集計テーブル）のみが破損している場合は、`repair rebuild-projections` で修復できる可能性があります
+1. **Consider restoring from a backup** (see `backup restore` below)
+2. If only projections (aggregation tables) are corrupted, `repair rebuild-projections` may be able to repair them
 
-### unverifiable_signatures が多い場合
+### When unverifiable_signatures Is High
 
-ピアの公開鍵がローカルに登録されていない可能性があります。
+The peer's public key may not be registered locally.
 
 ```bash
-# ピアの公開鍵を登録
+# Register the peer's public key
 starweft peer add /ip4/192.168.1.10/tcp/9000 \
   --public-key "<base64 public key>"
 
-# 再度監査を実行
+# Run the audit again
 starweft audit verify-log
 ```
 
 ## repair rebuild-projections
 
-`repair rebuild-projections` はイベントログ（`task_events` テーブル）から**プロジェクションテーブルを再構築**するコマンドです。
+`repair rebuild-projections` is a command that **rebuilds projection tables** from the event log (`task_events` table).
 
 ```bash
 starweft repair rebuild-projections
 ```
 
-<Terminal title="出力例">
+<Terminal title="Example output">
 ```
 replayed_events: 42
 rebuilt_projects: 3
@@ -112,56 +112,56 @@ rebuilt_snapshots: 3
 ```
 </Terminal>
 
-### rebuild-projections が修復できるもの
+### What rebuild-projections Can Repair
 
-- `projects` テーブル（プロジェクト状態の集計）
-- `tasks` テーブル（タスク状態の集計）
-- `task_results` / `evaluations` / `publish_events` テーブル
-- `snapshots` テーブル
-- `stop_orders` / `stop_receipts` テーブル
-- `approval_state` テーブル
+- `projects` table (project state aggregation)
+- `tasks` table (task state aggregation)
+- `task_results` / `evaluations` / `publish_events` tables
+- `snapshots` table
+- `stop_orders` / `stop_receipts` tables
+- `approval_state` table
 
 <Callout type="warning">
-`rebuild-projections` はイベントログ自体を修復するものではありません。イベントログが改ざん・破損している場合は、バックアップからの復元が必要です。
+`rebuild-projections` does not repair the event log itself. If the event log has been tampered with or corrupted, restoration from a backup is required.
 </Callout>
 
 ## backup create / backup restore
 
-### バックアップの作成
+### Creating a Backup
 
 ```bash
 starweft backup create --output ~/starweft-backup
 ```
 
-バックアップは指定ディレクトリにファイル一式をコピーし、**署名付き `manifest.json`** を生成します。
+The backup copies the complete set of files to the specified directory and generates a **signed `manifest.json`**.
 
-<Accordion title="バックアップに含まれるファイル">
+<Accordion title="Files included in the backup">
 
-| パス | 内容 |
+| Path | Contents |
 |---|---|
-| `config.toml` | ノード設定 |
-| `identity/actor_key` | メイン identity 鍵 |
-| `identity/stop_authority_key` | 停止権限鍵（存在する場合） |
-| `ledger/node.db` | SQLite データベース（`VACUUM INTO` によるクリーンコピー） |
-| `artifacts/` | タスク成果物 |
-| `logs/` | ログファイル |
-| `cache/` | キャッシュ |
+| `config.toml` | Node configuration |
+| `identity/actor_key` | Main identity key |
+| `identity/stop_authority_key` | Stop authority key (if present) |
+| `ledger/node.db` | SQLite database (clean copy via `VACUUM INTO`) |
+| `artifacts/` | Task artifacts |
+| `logs/` | Log files |
+| `cache/` | Cache |
 
 </Accordion>
 
-### バックアップの信頼アンカー
+### Backup Trust Anchor
 
-バックアップの `manifest.json` には以下の保護メカニズムが組み込まれています。
+The backup's `manifest.json` incorporates the following protection mechanisms.
 
 <Steps>
 
-### Ed25519 署名
+### Ed25519 Signature
 
-マニフェストの `payload` フィールド全体が `actor_key` で署名されます。これにより、マニフェスト自体の改ざんを検出します。
+The entire `payload` field of the manifest is signed with the `actor_key`. This detects tampering with the manifest itself.
 
-### ファイルセット整合性検証
+### File Set Integrity Verification
 
-マニフェストには含まれる全ファイルの **SHA-256 チェックサム**とサイズが記録されます。リストア時にすべてのファイルのチェックサムが照合されます。
+The manifest records the **SHA-256 checksums** and sizes of all included files. During restoration, the checksums of all files are verified.
 
 ```json
 {
@@ -172,73 +172,73 @@ starweft backup create --output ~/starweft-backup
 }
 ```
 
-### 署名者の信頼アンカー
+### Signer Trust Anchor
 
-マニフェストの `signer_public_key` フィールドとバンドル内の `identity/actor_key` ファイルの公開鍵が一致することを検証します。攻撃者がマニフェストと `signer_public_key` を差し替えても、バンドル内の `actor_key` との不一致で検出されます。`actor_key` 自体のチェックサムもマニフェストに含まれるため、循環的に保護されています。
+Verifies that the manifest's `signer_public_key` field matches the public key from the `identity/actor_key` file in the bundle. Even if an attacker replaces both the manifest and `signer_public_key`, the mismatch with the `actor_key` in the bundle will be detected. The checksum of `actor_key` itself is also included in the manifest, providing circular protection.
 
-### 余剰ファイルの検出
+### Extra File Detection
 
-マニフェストに記載されていないファイルがバンドル内に存在する場合、リストアは拒否されます。これにより、攻撃者によるファイル注入を防ぎます。
+If files not listed in the manifest are present in the bundle, the restore is rejected. This prevents file injection by an attacker.
 
 </Steps>
 
-### バックアップの復元
+### Restoring a Backup
 
 ```bash
 starweft backup restore --input ~/starweft-backup
 ```
 
-リストア時には以下の検証が自動的に行われます。
+During restoration, the following verifications are automatically performed.
 
-1. `manifest.json` の存在とフォーマットバージョン (`starweft-local-backup/v1`) の確認
-2. マニフェスト署名の Ed25519 検証
-3. `signer_public_key` とバンドル内 `actor_key` の一致確認
-4. 全ファイルの SHA-256 チェックサムとサイズの照合
-5. マニフェスト外ファイルが存在しないことの確認
-6. リストア先に既存 identity がある場合、署名者との一致確認
+1. Confirm the existence of `manifest.json` and its format version (`starweft-local-backup/v1`)
+2. Ed25519 verification of the manifest signature
+3. Confirm that `signer_public_key` matches the `actor_key` in the bundle
+4. Verify SHA-256 checksums and sizes of all files
+5. Confirm that no files outside the manifest are present
+6. If an existing identity is present at the restore destination, confirm it matches the signer
 
 <Callout type="warning">
-リストア先に異なる identity が存在する場合、デフォルトでエラーになります。別ノードのバックアップを強制的に復元するには `--force` を使用してください。
+If a different identity exists at the restore destination, an error is raised by default. Use `--force` to forcibly restore a backup from a different node.
 </Callout>
 
 ```bash
-# 別ノードのバックアップを強制復元
+# Forcibly restore a backup from a different node
 starweft backup restore --input ~/starweft-backup --force
 ```
 
-### 既存データの上書き
+### Overwriting Existing Data
 
-`--force` フラグなしの場合、リストア先に既存ファイルがあるとエラーになります。`--force` を指定すると既存データを上書きします。
+Without the `--force` flag, an error is raised if existing files are found at the restore destination. Specifying `--force` overwrites the existing data.
 
-## 推奨ワークフロー
+## Recommended Workflow
 
-定期的な監査とバックアップで、データの整合性を維持できます。
+Regular auditing and backups help maintain data integrity.
 
 <Steps>
 
-### 定期的な監査
+### Periodic Auditing
 
 ```bash
 starweft audit verify-log
 ```
 
-異常がないことを確認します。
+Confirm that no issues are found.
 
-### バックアップの作成
+### Creating a Backup
 
 ```bash
 starweft backup create --output ~/starweft-backup-$(date +%Y%m%d)
 ```
 
-### 問題発生時の修復
+### Repairing When Issues Occur
 
-プロジェクションが破損した場合はまず `rebuild-projections` を試みます。
+If projections are corrupted, first try `rebuild-projections`.
 
 ```bash
 starweft repair rebuild-projections
 ```
 
-イベントログ自体に問題がある場合は、バックアップから復元します。
+If the event log itself has issues, restore from a backup.
 
 ```bash
 starweft backup restore --input ~/starweft-backup-20260315 --force
@@ -246,7 +246,7 @@ starweft backup restore --input ~/starweft-backup-20260315 --force
 
 </Steps>
 
-## 関連ページ
+## Related Pages
 
-<LinkCard href="/docs/security/signing" title="メッセージ署名" description="Ed25519 署名と Canonical JSON による完全性保証" />
-<LinkCard href="/docs/security/key-management" title="鍵管理" description="Ed25519 鍵の生成、保管、交換方法" />
+<LinkCard href="/docs/security/signing" title="Message Signing" description="Integrity guarantees through Ed25519 signing and Canonical JSON" />
+<LinkCard href="/docs/security/key-management" title="Key Management" description="Ed25519 key generation, storage, and exchange methods" />

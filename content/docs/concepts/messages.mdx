@@ -3,75 +3,75 @@ title: "Messages"
 description: "How messages are structured, signed, and delivered between nodes."
 ---
 
-## メッセージの概要
+## Message Overview
 
-Starweft のノード間通信はすべて **署名付きエンベロープ** で行われます。各メッセージは `MsgType` で型付けされ、canonical JSON シリアライズと Ed25519 署名により改ざんを防止します。
+All inter-node communication in Starweft is conducted via **signed envelopes**. Each message is typed with a `MsgType`, and tampering is prevented through canonical JSON serialization and Ed25519 signatures.
 
-## エンベロープ構造
+## Envelope Structure
 
-メッセージは 3 段階のエンベロープ形式を経由して送受信されます。
+Messages are sent and received through a three-stage envelope format.
 
 ### UnsignedEnvelope
 
-署名前のエンベロープです。メッセージ生成時にフィールドを設定し、`sign()` で署名済みエンベロープに変換します。
+This is the envelope before signing. Fields are populated during message creation, then converted into a signed envelope via `sign()`.
 
 ```rust
 pub struct UnsignedEnvelope<T> {
     pub protocol: String,           // "starweft/0.1"
-    pub msg_id: MessageId,          // ULID ベースの一意 ID
-    pub msg_type: MsgType,          // メッセージ種別
-    pub from_actor_id: ActorId,     // 送信者のアクター ID
-    pub to_actor_id: Option<ActorId>, // 宛先 (None = ブロードキャスト)
+    pub msg_id: MessageId,          // ULID-based unique ID
+    pub msg_type: MsgType,          // Message type
+    pub from_actor_id: ActorId,     // Sender's actor ID
+    pub to_actor_id: Option<ActorId>, // Recipient (None = broadcast)
     pub vision_id: Option<VisionId>,
     pub project_id: Option<ProjectId>,
     pub task_id: Option<TaskId>,
-    pub lamport_ts: u64,            // Lamport 論理タイムスタンプ
-    pub created_at: OffsetDateTime, // 作成日時
-    pub expires_at: Option<OffsetDateTime>, // 有効期限
-    pub body: T,                    // 型付きメッセージボディ
+    pub lamport_ts: u64,            // Lamport logical timestamp
+    pub created_at: OffsetDateTime, // Creation timestamp
+    pub expires_at: Option<OffsetDateTime>, // Expiration time
+    pub body: T,                    // Typed message body
 }
 ```
 
-### Envelope (署名済み)
+### Envelope (Signed)
 
-`UnsignedEnvelope.sign(keypair)` で生成される署名済みエンベロープです。`MessageSignature` が付与されています。
+A signed envelope produced by `UnsignedEnvelope.sign(keypair)`. It includes a `MessageSignature`.
 
 ```rust
 pub struct Envelope<T> {
-    // ... UnsignedEnvelope と同じフィールド ...
+    // ... same fields as UnsignedEnvelope ...
     pub body: T,
-    pub signature: MessageSignature,  // Ed25519 署名
+    pub signature: MessageSignature,  // Ed25519 signature
 }
 ```
 
-### WireEnvelope (ワイヤー形式)
+### WireEnvelope (Wire Format)
 
-ネットワーク転送時の形式です。body が型付き `T` から `serde_json::Value` (untyped JSON) に変換されています。
+The format used for network transmission. The body is converted from a typed `T` to `serde_json::Value` (untyped JSON).
 
 ```rust
 pub struct WireEnvelope {
-    // ... Envelope と同じフィールド ...
-    pub body: Value,               // 非型付き JSON
+    // ... same fields as Envelope ...
+    pub body: Value,               // Untyped JSON
     pub signature: MessageSignature,
 }
 ```
 
 <Callout type="info">
-受信側では `WireEnvelope.decode::<T>()` で `msg_type` に基づいて型付き `Envelope<T>` にデシリアライズし、`verify_with_key()` で署名を検証します。
+On the receiving side, `WireEnvelope.decode::<T>()` deserializes the wire envelope into a typed `Envelope<T>` based on the `msg_type`, and `verify_with_key()` is used to verify the signature.
 </Callout>
 
-## Canonical JSON シリアライズ
+## Canonical JSON Serialization
 
-署名の決定性を保証するため、署名対象は **canonical JSON** にシリアライズされます。
+To guarantee deterministic signatures, the data to be signed is serialized as **canonical JSON**.
 
-- JSON キーはアルファベット順にソート
-- 不要な空白は除去
-- 浮動小数点や日時の表現は `serde_json` のデフォルト出力に準拠
+- JSON keys are sorted alphabetically
+- Unnecessary whitespace is removed
+- Floating-point and datetime representations conform to `serde_json` default output
 
-署名対象には body を含むエンベロープの全フィールドが含まれますが、`signature` フィールド自体は含まれません。
+The signing target includes all envelope fields including the body, but excludes the `signature` field itself.
 
 ```rust
-// 署名対象の構造体
+// Structure used as the signing target
 struct SignableEnvelope<'a, T> {
     protocol: &'a str,
     msg_id: &'a MessageId,
@@ -88,55 +88,55 @@ struct SignableEnvelope<'a, T> {
 }
 ```
 
-## メッセージタイプ一覧
+## Message Type Reference
 
-Starweft プロトコルは以下のメッセージタイプを定義しています。
+The Starweft protocol defines the following message types.
 
-### ビジョン・プロジェクト
+### Vision & Project
 
 <Accordion title="VisionIntent">
-Principal が投入するビジョン (目標定義) です。Owner がこれを受け取り、プロジェクトとタスクに分解します。
+A vision (goal definition) submitted by the Principal. The Owner receives this and decomposes it into projects and tasks.
 
 ```rust
 pub struct VisionIntent {
-    pub title: String,              // ビジョンのタイトル
-    pub raw_vision_text: String,    // 自由記述のビジョンテキスト
-    pub constraints: VisionConstraints, // 実行制約
+    pub title: String,              // Vision title
+    pub raw_vision_text: String,    // Free-form vision text
+    pub constraints: VisionConstraints, // Execution constraints
 }
 ```
 
-**送信**: Principal → Owner
+**Direction**: Principal → Owner
 </Accordion>
 
 <Accordion title="ProjectCharter">
-Owner がビジョンから生成するプロジェクト憲章です。プロジェクトの構造と評価ポリシーを定義します。
+A project charter generated by the Owner from a vision. It defines the project structure and evaluation policy.
 
 ```rust
 pub struct ProjectCharter {
     pub project_id: ProjectId,
     pub vision_id: VisionId,
-    pub principal_actor_id: ActorId,     // 依頼元
-    pub owner_actor_id: ActorId,         // オーケストレーター
+    pub principal_actor_id: ActorId,     // Requester
+    pub owner_actor_id: ActorId,         // Orchestrator
     pub title: String,
     pub objective: String,
-    pub stop_authority_actor_id: ActorId, // 停止権限者
+    pub stop_authority_actor_id: ActorId, // Stop authority holder
     pub participant_policy: ParticipantPolicy,
     pub evaluation_policy: EvaluationPolicy,
 }
 ```
 
-**送信**: Owner → Principal (+ ブロードキャスト)
+**Direction**: Owner → Principal (+ broadcast)
 </Accordion>
 
-### ケイパビリティ発見
+### Capability Discovery
 
 <Accordion title="CapabilityQuery">
-ノードが自身のアイデンティティとケイパビリティを通知し、ピアのケイパビリティを問い合わせます。
+A node announces its identity and capabilities, and queries for peer capabilities.
 
 ```rust
 pub struct CapabilityQuery {
     pub node_id: NodeId,
-    pub public_key: String,          // Base64 公開鍵
+    pub public_key: String,          // Base64-encoded public key
     pub stop_public_key: Option<String>,
     pub capabilities: Vec<String>,   // e.g. ["openclaw.execution.v1"]
     pub listen_addresses: Vec<String>,
@@ -144,13 +144,13 @@ pub struct CapabilityQuery {
 }
 ```
 
-**送信**: 全ロール → ブロードキャスト
+**Direction**: All roles → Broadcast
 
-**特記**: このメッセージは自己証明的に検証されます (body 内の `public_key` で署名を検証)。事前のピア公開鍵登録は不要です。
+**Note**: This message is self-certifying — the signature is verified using the `public_key` contained in the body. No prior peer public key registration is required.
 </Accordion>
 
 <Accordion title="CapabilityAdvertisement">
-CapabilityQuery への応答として、自ノードのケイパビリティを通知します。
+Sent in response to a CapabilityQuery, advertising the local node's capabilities.
 
 ```rust
 pub struct CapabilityAdvertisement {
@@ -163,13 +163,13 @@ pub struct CapabilityAdvertisement {
 }
 ```
 
-**送信**: 全ロール → クエリ送信元
+**Direction**: All roles → Query originator
 </Accordion>
 
-### 参加制御
+### Participation Control
 
 <Accordion title="JoinOffer">
-Owner が Worker にプロジェクト参加を提案します。必要なケイパビリティとタスク概要を含みます。
+The Owner proposes project participation to a Worker. Includes the required capabilities and a task outline.
 
 ```rust
 pub struct JoinOffer {
@@ -179,11 +179,11 @@ pub struct JoinOffer {
 }
 ```
 
-**送信**: Owner → Worker
+**Direction**: Owner → Worker
 </Accordion>
 
 <Accordion title="JoinAccept">
-Worker が JoinOffer を受諾します。
+A Worker accepts a JoinOffer.
 
 ```rust
 pub struct JoinAccept {
@@ -192,11 +192,11 @@ pub struct JoinAccept {
 }
 ```
 
-**送信**: Worker → Owner
+**Direction**: Worker → Owner
 </Accordion>
 
 <Accordion title="JoinReject">
-Worker が JoinOffer を拒否します。
+A Worker rejects a JoinOffer.
 
 ```rust
 pub struct JoinReject {
@@ -205,45 +205,45 @@ pub struct JoinReject {
 }
 ```
 
-**送信**: Worker → Owner
+**Direction**: Worker → Owner
 </Accordion>
 
-### タスク実行
+### Task Execution
 
 <Accordion title="TaskDelegated">
-Owner が Worker にタスクを委任します。入力データと期待する出力スキーマを含みます。
+The Owner delegates a task to a Worker. Includes input data and the expected output schema.
 
 ```rust
 pub struct TaskDelegated {
-    pub parent_task_id: Option<TaskId>, // 親タスク (サブタスクの場合)
+    pub parent_task_id: Option<TaskId>, // Parent task (if this is a subtask)
     pub title: String,
     pub description: String,
     pub objective: String,
     pub required_capability: String,
-    pub input_payload: Value,            // タスクへの入力データ
-    pub expected_output_schema: Value,   // 期待する出力の JSON Schema
+    pub input_payload: Value,            // Input data for the task
+    pub expected_output_schema: Value,   // JSON Schema for expected output
 }
 ```
 
-**送信**: Owner → Worker
+**Direction**: Owner → Worker
 </Accordion>
 
 <Accordion title="TaskProgress">
-Worker がタスクの進捗を報告します。OpenClaw bridge の `PROGRESS:<float>:<message>` 出力から自動生成されます。
+A Worker reports task progress. Automatically generated from the OpenClaw bridge's `PROGRESS:<float>:<message>` output.
 
 ```rust
 pub struct TaskProgress {
-    pub progress: f32,      // 0.0 〜 1.0
+    pub progress: f32,      // 0.0 to 1.0
     pub message: String,
     pub updated_at: OffsetDateTime,
 }
 ```
 
-**送信**: Worker → Owner
+**Direction**: Worker → Owner
 </Accordion>
 
 <Accordion title="TaskResultSubmitted">
-Worker がタスクの実行結果を提出します。
+A Worker submits the execution result of a task.
 
 ```rust
 pub struct TaskResultSubmitted {
@@ -256,27 +256,27 @@ pub struct TaskResultSubmitted {
 }
 ```
 
-**送信**: Worker → Owner
+**Direction**: Worker → Owner
 </Accordion>
 
 <Accordion title="EvaluationIssued">
-Owner がタスク結果を評価して発行する評価証明書です。
+An evaluation certificate issued by the Owner after evaluating a task result.
 
 ```rust
 pub struct EvaluationIssued {
-    pub subject_actor_id: ActorId,       // 評価対象の Worker
+    pub subject_actor_id: ActorId,       // Worker being evaluated
     pub scores: BTreeMap<String, f32>,   // quality, speed, reliability, alignment
     pub comment: String,
 }
 ```
 
-**送信**: Owner → Worker (+ ブロードキャスト)
+**Direction**: Owner → Worker (+ broadcast)
 </Accordion>
 
-### 停止制御
+### Stop Control
 
 <Accordion title="StopOrder">
-プロジェクトまたはタスクツリーの停止命令です。`stop_authority_key` で署名されます。
+A stop order for a project or task tree. Signed with the `stop_authority_key`.
 
 ```rust
 pub struct StopOrder {
@@ -289,11 +289,11 @@ pub struct StopOrder {
 }
 ```
 
-**送信**: Principal → Owner → Worker
+**Direction**: Principal → Owner → Worker
 </Accordion>
 
 <Accordion title="StopAck">
-StopOrder を受信し、停止処理を開始したことの確認応答です。
+An acknowledgment confirming that a StopOrder has been received and stop processing has begun.
 
 ```rust
 pub struct StopAck {
@@ -304,11 +304,11 @@ pub struct StopAck {
 }
 ```
 
-**送信**: Worker → Owner → Principal
+**Direction**: Worker → Owner → Principal
 </Accordion>
 
 <Accordion title="StopComplete">
-停止処理が完了したことの最終確認です。
+A final confirmation that stop processing has completed.
 
 ```rust
 pub struct StopComplete {
@@ -319,13 +319,13 @@ pub struct StopComplete {
 }
 ```
 
-**送信**: Worker → Owner → Principal
+**Direction**: Worker → Owner → Principal
 </Accordion>
 
-### スナップショット
+### Snapshots
 
 <Accordion title="SnapshotRequest / SnapshotResponse">
-プロジェクトまたはタスクの状態スナップショットを要求・返却します。
+Used to request and return a state snapshot of a project or task.
 
 ```rust
 pub struct SnapshotRequest {
@@ -340,28 +340,28 @@ pub struct SnapshotResponse {
 }
 ```
 
-**送信**: Principal → Owner (Request) / Owner → Principal (Response)
+**Direction**: Principal → Owner (Request) / Owner → Principal (Response)
 </Accordion>
 
-### パブリッシュ
+### Publishing
 
 <Accordion title="PublishIntentProposed / PublishIntentSkipped / PublishResultRecorded">
-タスク結果の外部公開 (GitHub など) に関するメッセージ群です。
+A group of messages related to the external publication of task results (e.g., to GitHub).
 
-- **PublishIntentProposed**: 公開提案
-- **PublishIntentSkipped**: 公開スキップ通知
-- **PublishResultRecorded**: 公開結果の記録
+- **PublishIntentProposed**: A proposal to publish
+- **PublishIntentSkipped**: A notification that publication was skipped
+- **PublishResultRecorded**: A record of the publication result
 
-**送信**: Owner 内部で生成・記録
+**Direction**: Generated and recorded internally by the Owner
 </Accordion>
 
-### 承認制御
+### Approval Control
 
 <Accordion title="ApprovalGranted / ApprovalApplied">
-タスク実行前の承認ゲートを制御するメッセージです。
+Messages that control the approval gate before task execution.
 
-- **ApprovalGranted**: Principal がプロジェクトまたはタスクの実行を承認
-- **ApprovalApplied**: Owner が承認を適用し、一時停止中のタスクを再開
+- **ApprovalGranted**: The Principal approves execution of a project or task
+- **ApprovalApplied**: The Owner applies the approval and resumes paused tasks
 
 ```rust
 pub struct ApprovalGranted {
@@ -371,12 +371,12 @@ pub struct ApprovalGranted {
 }
 ```
 
-**送信**: Principal → Owner (Granted) / Owner → Principal (Applied)
+**Direction**: Principal → Owner (Granted) / Owner → Principal (Applied)
 </Accordion>
 
-## outbox パイプラインによる配送
+## Delivery via the Outbox Pipeline
 
-すべてのメッセージは outbox キューを経由して配送されます。
+All messages are delivered through an outbox queue.
 
 ```
 queue_outgoing(envelope)
@@ -386,33 +386,33 @@ outbox_messages (delivery_state = "queued")
     │
     ▼ flush_outbox()
     │
-    ├── to_actor_id あり → peer_addresses から対象ピアを検索
+    ├── to_actor_id present → Look up target peer from peer_addresses
     │
-    ├── to_actor_id なし → 全ピアにブロードキャスト
-    │                      (relay ノードは送信元を除外)
+    ├── to_actor_id absent → Broadcast to all peers
+    │                        (relay nodes exclude the sender)
     │
     ▼ transport.deliver()
     │
-    ├── 成功 → delivery_state = "delivered_local"
-    ├── 失敗 → リトライ (250ms 間隔, 最大 20 回)
-    └── 上限超過 → delivery_state = "dead_letter"
+    ├── Success → delivery_state = "delivered_local"
+    ├── Failure → Retry (250ms interval, up to 20 attempts)
+    └── Limit exceeded → delivery_state = "dead_letter"
 ```
 
 <Callout type="tip">
-配送先が複数ある場合、個別の `outbox_deliveries` レコードで配送状態を追跡します。すべてのターゲットに配送完了すると、outbox メッセージ全体が delivered 状態になります。
+When there are multiple delivery targets, individual `outbox_deliveries` records track the delivery state for each target. Once delivery to all targets is complete, the outbox message as a whole transitions to the delivered state.
 </Callout>
 
-## メッセージの有効期限
+## Message Expiration
 
-エンベロープに `expires_at` が設定されている場合、受信側は現在時刻 + 30 秒のスキュー許容を超えていればメッセージを拒否します。
+If `expires_at` is set on an envelope, the receiving side rejects the message if the current time exceeds the expiration plus a 30-second skew tolerance.
 
 ```rust
 const ENVELOPE_EXPIRY_SKEW_SEC: i64 = 30;
 ```
 
-## プロトコルバージョン
+## Protocol Version
 
-現在のプロトコルバージョンは `"starweft/0.1"` です。受信メッセージのプロトコルバージョンが異なる場合、`allow_legacy_protocols = true` が設定されていなければ拒否されます。
+The current protocol version is `"starweft/0.1"`. If an incoming message has a different protocol version, it is rejected unless `allow_legacy_protocols = true` is configured.
 
 ```toml
 [compatibility]
