@@ -201,30 +201,21 @@ pub struct MessageSignature {
 
 Starweft のコードベースは責務ごとに分離されたクレートで構成されています。
 
-<FileTree data={[
-  {
-    name: "apps/starweft",
-    type: "directory",
-    children: [
-      { name: "src — CLI 本体 (コマンド, ランタイム, TUI)", type: "directory" }
-    ]
-  },
-  {
-    name: "crates",
-    type: "directory",
-    children: [
-      { name: "starweft-protocol — メッセージ型, エンベロープ, 署名検証", type: "directory" },
-      { name: "starweft-store — SQLite 永続化, イベントソーシング", type: "directory" },
-      { name: "starweft-runtime — inbox/outbox パイプライン", type: "directory" },
-      { name: "starweft-p2p — local_mailbox + libp2p トランスポート", type: "directory" },
-      { name: "starweft-crypto — Ed25519 鍵管理, canonical JSON", type: "directory" },
-      { name: "starweft-id — ULID ベースの型付き ID", type: "directory" },
-      { name: "starweft-observation — タスク分解, 評価スコアリング", type: "directory" },
-      { name: "starweft-openclaw-bridge — OpenClaw サブプロセス実行", type: "directory" },
-      { name: "starweft-stop — 停止制御ロジック", type: "directory" }
-    ]
-  }
-]} />
+```
+apps/starweft/
+└── src/                — CLI 本体 (コマンド, ランタイム, TUI)
+
+crates/
+├── starweft-protocol/  — メッセージ型, エンベロープ, 署名検証
+├── starweft-store/     — SQLite 永続化, イベントソーシング
+├── starweft-runtime/   — inbox/outbox パイプライン
+├── starweft-p2p/       — local_mailbox + libp2p トランスポート
+├── starweft-crypto/    — Ed25519 鍵管理, canonical JSON
+├── starweft-id/        — ULID ベースの型付き ID
+├── starweft-observation/ — タスク分解, 評価スコアリング
+├── starweft-openclaw-bridge/ — OpenClaw サブプロセス実行
+└── starweft-stop/      — 停止制御ロジック
+```
 
 依存関係の方向:
 

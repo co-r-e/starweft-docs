@@ -128,11 +128,11 @@ pub struct EvaluationPolicy {
 
 失敗したタスクに対して、ルールベースのリトライ判定を行います。
 
-<ApiTable data={[
-  { name: "timeout / timed out", description: "同一 Worker でリトライ (一時的なタイムアウト)" },
-  { name: "process failed / worker overloaded / worker unavailable", description: "別の Worker でリトライ (一時的な実行障害)" },
-  { name: "capability mismatch / invalid input / schema / unauthorized", description: "リトライしない (恒久的な失敗)" }
-]} />
+| エラーパターン | リトライ判定 |
+|---------------|-------------|
+| `timeout` / `timed out` | 同一 Worker でリトライ (一時的なタイムアウト) |
+| `process failed` / `worker overloaded` / `worker unavailable` | 別の Worker でリトライ (一時的な実行障害) |
+| `capability mismatch` / `invalid input` / `schema` / `unauthorized` | リトライしない (恒久的な失敗) |
 
 ```toml
 [owner]

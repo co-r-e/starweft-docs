@@ -23,14 +23,14 @@ starweft audit verify-log
 
 `audit verify-log` は以下の項目を検査します。
 
-<ApiTable data={[
-  { name: "raw JSON 整合性", description: "保存された生 JSON (raw_json) とデータベースカラムに分解された値が一致するか検証。改ざんの直接的な検出手段。" },
-  { name: "Ed25519 署名検証", description: "生 JSON に対して送信者の公開鍵で Ed25519 署名を再検証。鍵が不明な場合は unverifiable として報告。" },
-  { name: "task_id の存在", description: "TaskDelegated / TaskProgress / TaskResultSubmitted イベントに task_id が設定されているか確認。" },
-  { name: "ProjectCharter 重複", description: "同一 project_id に対する ProjectCharter が複数存在しないか確認。" },
-  { name: "Lamport タイムスタンプ", description: "同一プロジェクト内で Lamport タイムスタンプが単調増加しているか確認。回帰はイベント順序の不整合を示す。" },
-  { name: "JSON パース", description: "イベントの構造体デシリアライズが正常に完了するか確認。" }
-]} />
+| 検査項目 | 説明 |
+|---------|------|
+| raw JSON 整合性 | 保存された生 JSON (raw_json) とデータベースカラムに分解された値が一致するか検証。改ざんの直接的な検出手段。 |
+| Ed25519 署名検証 | 生 JSON に対して送信者の公開鍵で Ed25519 署名を再検証。鍵が不明な場合は unverifiable として報告。 |
+| task_id の存在 | TaskDelegated / TaskProgress / TaskResultSubmitted イベントに task_id が設定されているか確認。 |
+| ProjectCharter 重複 | 同一 project_id に対する ProjectCharter が複数存在しないか確認。 |
+| Lamport タイムスタンプ | 同一プロジェクト内で Lamport タイムスタンプが単調増加しているか確認。回帰はイベント順序の不整合を示す。 |
+| JSON パース | イベントの構造体デシリアライズが正常に完了するか確認。 |
 
 ### 出力の読み方
 

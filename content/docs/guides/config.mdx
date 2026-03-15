@@ -50,22 +50,21 @@ starweft config validate --data-dir ~/.starweft
 
 ## 設定セクション一覧
 
-<FileTree data={[
-  { name: "config.toml", type: "file", children: [
-    { name: "[node] — ノードの基本設定", type: "file" },
-    { name: "[identity] — 鍵ファイルのパス", type: "file" },
-    { name: "[discovery] — ピア検出・mDNS・レジストリ", type: "file" },
-    { name: "[p2p] — トランスポート設定", type: "file" },
-    { name: "[ledger] — SQLite データベースのパス", type: "file" },
-    { name: "[openclaw] — OpenClaw ブリッジ設定", type: "file" },
-    { name: "[compatibility] — プロトコルバージョン", type: "file" },
-    { name: "[owner] — Owner ロール固有の設定", type: "file" },
-    { name: "[worker] — Worker ロール固有の設定", type: "file" },
-    { name: "[observation] — プランニング・評価エンジン", type: "file" },
-    { name: "[logs] — ログローテーション", type: "file" },
-    { name: "[artifacts] — 成果物の保存設定", type: "file" }
-  ]}
-]} />
+```
+config.toml
+├── [node]           — ノードの基本設定
+├── [identity]       — 鍵ファイルのパス
+├── [discovery]      — ピア検出・mDNS・レジストリ
+├── [p2p]            — トランスポート設定
+├── [ledger]         — SQLite データベースのパス
+├── [openclaw]       — OpenClaw ブリッジ設定
+├── [compatibility]  — プロトコルバージョン
+├── [owner]          — Owner ロール固有の設定
+├── [worker]         — Worker ロール固有の設定
+├── [observation]    — プランニング・評価エンジン
+├── [logs]           — ログローテーション
+└── [artifacts]      — 成果物の保存設定
+```
 
 ## `[node]` セクション
 
@@ -80,13 +79,13 @@ listen = ["/unix//home/user/.starweft/mailbox.sock"]
 log_level = "info"
 ```
 
-<ApiTable data={[
-  { field: "role", type: "string", description: "ノードの役割: principal / owner / worker / relay" },
-  { field: "display_name", type: "string", description: "ノードの表示名" },
-  { field: "data_dir", type: "string", description: "データディレクトリのパス" },
-  { field: "listen", type: "string[]", description: "リッスンアドレスのリスト" },
-  { field: "log_level", type: "string", description: "ログレベル: trace / debug / info / warn / error" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `role` | string | ノードの役割: principal / owner / worker / relay |
+| `display_name` | string | ノードの表示名 |
+| `data_dir` | string | データディレクトリのパス |
+| `listen` | string[] | リッスンアドレスのリスト |
+| `log_level` | string | ログレベル: trace / debug / info / warn / error |
 
 ### リッスンアドレスの形式
 
@@ -106,10 +105,10 @@ actor_key_path = "~/.starweft/identity/actor_key"
 stop_authority_key_path = "~/.starweft/identity/stop_authority_key"
 ```
 
-<ApiTable data={[
-  { field: "actor_key_path", type: "string?", description: "メッセージ署名に使用する Ed25519 秘密鍵のパス" },
-  { field: "stop_authority_key_path", type: "string?", description: "停止命令の署名に使用する鍵のパス（principal のみ）" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `actor_key_path` | string? | メッセージ署名に使用する Ed25519 秘密鍵のパス |
+| `stop_authority_key_path` | string? | 停止命令の署名に使用する鍵のパス（principal のみ） |
 
 <Callout type="info">
   `stop_authority_key_path` は principal ロールでのみ自動生成されます。他のロールでは `null` です。
@@ -129,16 +128,16 @@ registry_ttl_sec = 300
 registry_heartbeat_sec = 60
 ```
 
-<ApiTable data={[
-  { field: "seeds", type: "string[]", description: "起動時に接続するシードピアのマルチアドレス" },
-  { field: "auto_discovery", type: "bool", description: "CapabilityQuery/Advertisement の自動交換 (default: true)" },
-  { field: "mdns", type: "bool", description: "mDNS によるローカルネットワーク自動検出 (default: false)" },
-  { field: "registry_url", type: "string?", description: "ピアレジストリサーバーの URL" },
-  { field: "registry_ttl_sec", type: "u64", description: "レジストリ登録の TTL（秒） (default: 300)" },
-  { field: "registry_heartbeat_sec", type: "u64", description: "レジストリへのハートビート間隔（秒） (default: 60)" },
-  { field: "registry_shared_secret", type: "string?", description: "レジストリ認証用の共有シークレット" },
-  { field: "registry_shared_secret_env", type: "string?", description: "共有シークレットを読み取る環境変数名" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `seeds` | string[] | 起動時に接続するシードピアのマルチアドレス |
+| `auto_discovery` | bool | CapabilityQuery/Advertisement の自動交換 (default: true) |
+| `mdns` | bool | mDNS によるローカルネットワーク自動検出 (default: false) |
+| `registry_url` | string? | ピアレジストリサーバーの URL |
+| `registry_ttl_sec` | u64 | レジストリ登録の TTL（秒） (default: 300) |
+| `registry_heartbeat_sec` | u64 | レジストリへのハートビート間隔（秒） (default: 60) |
+| `registry_shared_secret` | string? | レジストリ認証用の共有シークレット |
+| `registry_shared_secret_env` | string? | 共有シークレットを読み取る環境変数名 |
 
 <Callout type="warning">
   `registry_shared_secret` を設定ファイルに直接記載する場合、ファイルのパーミッションが 0600（所有者のみ読み書き）であることを確認してください。`config show` で表示する際は自動的にマスクされます。
@@ -156,12 +155,12 @@ direct_preferred = true
 max_peers = 128
 ```
 
-<ApiTable data={[
-  { field: "transport", type: "string", description: "local_mailbox（Unix デフォルト）または libp2p（Windows デフォルト）" },
-  { field: "relay_enabled", type: "bool", description: "relay ノード経由の通信を許可 (default: true)" },
-  { field: "direct_preferred", type: "bool", description: "直接接続を優先 (default: true)" },
-  { field: "max_peers", type: "u16", description: "最大ピア数 (default: 128)" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `transport` | string | local_mailbox（Unix デフォルト）または libp2p（Windows デフォルト） |
+| `relay_enabled` | bool | relay ノード経由の通信を許可 (default: true) |
+| `direct_preferred` | bool | 直接接続を優先 (default: true) |
+| `max_peers` | u16 | 最大ピア数 (default: 128) |
 
 ## `[openclaw]` セクション
 
@@ -176,13 +175,13 @@ timeout_sec = 3600
 capability_version = "openclaw.execution.v1"
 ```
 
-<ApiTable data={[
-  { field: "enabled", type: "bool", description: "OpenClaw ブリッジを有効にする (default: false)" },
-  { field: "bin", type: "string", description: "OpenClaw バイナリのパス (default: openclaw)" },
-  { field: "working_dir", type: "string?", description: "サブプロセスの作業ディレクトリ" },
-  { field: "timeout_sec", type: "u64", description: "実行タイムアウト（秒） (default: 3600)" },
-  { field: "capability_version", type: "string", description: "capability 識別子 (default: openclaw.execution.v1)" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `enabled` | bool | OpenClaw ブリッジを有効にする (default: false) |
+| `bin` | string | OpenClaw バイナリのパス (default: openclaw) |
+| `working_dir` | string? | サブプロセスの作業ディレクトリ |
+| `timeout_sec` | u64 | 実行タイムアウト（秒） (default: 3600) |
+| `capability_version` | string | capability 識別子 (default: openclaw.execution.v1) |
 
 ## `[compatibility]` セクション
 
@@ -196,12 +195,12 @@ bridge_capability_version = "openclaw.execution.v1"
 allow_legacy_protocols = false
 ```
 
-<ApiTable data={[
-  { field: "protocol_version", type: "string", description: "メッセージプロトコルバージョン" },
-  { field: "schema_version", type: "string", description: "SQLite スキーマバージョン" },
-  { field: "bridge_capability_version", type: "string", description: "OpenClaw ブリッジの capability バージョン" },
-  { field: "allow_legacy_protocols", type: "bool", description: "古いプロトコルバージョンを許可 (default: false)" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `protocol_version` | string | メッセージプロトコルバージョン |
+| `schema_version` | string | SQLite スキーマバージョン |
+| `bridge_capability_version` | string | OpenClaw ブリッジの capability バージョン |
+| `allow_legacy_protocols` | bool | 古いプロトコルバージョンを許可 (default: false) |
 
 <Callout type="warning">
   `openclaw.capability_version` と `bridge_capability_version` が一致しない場合、ノード起動時にエラーが発生します。
@@ -233,12 +232,12 @@ action = "no_retry"
 reason = "permanent task/input failure"
 ```
 
-<ApiTable data={[
-  { field: "max_retry_attempts", type: "u64", description: "最大リトライ回数 (default: 8)" },
-  { field: "retry_cooldown_ms", type: "u64", description: "リトライ間隔（ミリ秒） (default: 250)" },
-  { field: "retry_strategy", type: "string", description: "リトライ戦略: rule_based (default: rule_based)" },
-  { field: "retry_rules", type: "array", description: "エラーパターンとリトライアクションのルール配列" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `max_retry_attempts` | u64 | 最大リトライ回数 (default: 8) |
+| `retry_cooldown_ms` | u64 | リトライ間隔（ミリ秒） (default: 250) |
+| `retry_strategy` | string | リトライ戦略: rule_based (default: rule_based) |
+| `retry_rules` | array | エラーパターンとリトライアクションのルール配列 |
 
 ### リトライアクション
 
@@ -258,10 +257,10 @@ accept_join_offers = true
 max_active_tasks = 1
 ```
 
-<ApiTable data={[
-  { field: "accept_join_offers", type: "bool", description: "JoinOffer を自動で受け入れる (default: true)" },
-  { field: "max_active_tasks", type: "u64", description: "同時実行可能なタスク数 (default: 1)" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `accept_join_offers` | bool | JoinOffer を自動で受け入れる (default: true) |
+| `max_active_tasks` | u64 | 同時実行可能なタスク数 (default: 1) |
 
 ## `[observation]` セクション
 
@@ -282,19 +281,19 @@ planner_capability_version = "openclaw.plan.v1"
 planner_fallback_to_heuristic = true
 ```
 
-<ApiTable data={[
-  { field: "cache_snapshots", type: "bool", description: "スナップショットのキャッシュ (default: true)" },
-  { field: "cache_ttl_sec", type: "u64", description: "キャッシュの有効期間（秒） (default: 30)" },
-  { field: "max_planned_tasks", type: "usize", description: "1 ビジョンから生成する最大タスク数 (default: 6)" },
-  { field: "min_task_objective_chars", type: "usize", description: "タスク目的の最小文字数 (default: 48)" },
-  { field: "planner", type: "string", description: "heuristic / openclaw / openclaw_worker (default: heuristic)" },
-  { field: "evaluator", type: "string", description: "heuristic (default: heuristic)" },
-  { field: "planner_bin", type: "string?", description: "openclaw プランナーのバイナリパス" },
-  { field: "planner_working_dir", type: "string?", description: "プランナーの作業ディレクトリ" },
-  { field: "planner_timeout_sec", type: "u64", description: "プランナーのタイムアウト（秒） (default: 120)" },
-  { field: "planner_capability_version", type: "string", description: "プランナーの capability バージョン (default: openclaw.plan.v1)" },
-  { field: "planner_fallback_to_heuristic", type: "bool", description: "OpenClaw プランナー失敗時にヒューリスティックへフォールバック (default: true)" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `cache_snapshots` | bool | スナップショットのキャッシュ (default: true) |
+| `cache_ttl_sec` | u64 | キャッシュの有効期間（秒） (default: 30) |
+| `max_planned_tasks` | usize | 1 ビジョンから生成する最大タスク数 (default: 6) |
+| `min_task_objective_chars` | usize | タスク目的の最小文字数 (default: 48) |
+| `planner` | string | heuristic / openclaw / openclaw_worker (default: heuristic) |
+| `evaluator` | string | heuristic (default: heuristic) |
+| `planner_bin` | string? | openclaw プランナーのバイナリパス |
+| `planner_working_dir` | string? | プランナーの作業ディレクトリ |
+| `planner_timeout_sec` | u64 | プランナーのタイムアウト（秒） (default: 120) |
+| `planner_capability_version` | string | プランナーの capability バージョン (default: openclaw.plan.v1) |
+| `planner_fallback_to_heuristic` | bool | OpenClaw プランナー失敗時にヒューリスティックへフォールバック (default: true) |
 
 ## `[logs]` セクション
 
@@ -306,10 +305,10 @@ rotate_max_bytes = 1048576
 max_archives = 5
 ```
 
-<ApiTable data={[
-  { field: "rotate_max_bytes", type: "u64", description: "ログファイルの最大サイズ（バイト） (default: 1048576 = 1MB)" },
-  { field: "max_archives", type: "usize", description: "保持するアーカイブファイル数 (default: 5)" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `rotate_max_bytes` | u64 | ログファイルの最大サイズ（バイト） (default: 1048576 = 1MB) |
+| `max_archives` | usize | 保持するアーカイブファイル数 (default: 5) |
 
 ## `[artifacts]` セクション
 
@@ -322,11 +321,11 @@ max_files = 256
 max_age_sec = 604800
 ```
 
-<ApiTable data={[
-  { field: "dir", type: "string", description: "成果物の保存ディレクトリ" },
-  { field: "max_files", type: "usize", description: "最大保存ファイル数 (default: 256)" },
-  { field: "max_age_sec", type: "u64", description: "成果物の最大保持期間（秒） (default: 604800 = 7日)" }
-]} />
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `dir` | string | 成果物の保存ディレクトリ |
+| `max_files` | usize | 最大保存ファイル数 (default: 256) |
+| `max_age_sec` | u64 | 成果物の最大保持期間（秒） (default: 604800 = 7日) |
 
 ## ロール別の推奨設定
 

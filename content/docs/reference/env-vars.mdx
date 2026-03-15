@@ -11,14 +11,14 @@ Starweft の動作に影響する環境変数の一覧です。Starweft は P2P 
 
 ## 環境変数一覧
 
-<ApiTable data={[
-  { flag: "STARWEFT_GITHUB_TOKEN", type: "string", default: "-", description: "GitHub API 認証トークン。publish github コマンドで使用。最優先" },
-  { flag: "GITHUB_TOKEN", type: "string", default: "-", description: "GitHub API 認証トークン。STARWEFT_GITHUB_TOKEN が未設定時にフォールバック" },
-  { flag: "GH_TOKEN", type: "string", default: "-", description: "GitHub API 認証トークン。上記 2 つが未設定時にフォールバック" },
-  { flag: "STARWEFT_GITHUB_API_BASE_URL", type: "string", default: "https://api.github.com", description: "GitHub API のベース URL。GitHub Enterprise 等で変更する場合に使用" },
-  { flag: "STARWEFT_REGISTRY_SHARED_SECRET", type: "string", default: "-", description: "レジストリ認証用の共有シークレット。registry serve の --shared-secret フラグと同等" },
-  { flag: "RUST_LOG", type: "string", default: "info", description: "ログフィルタ。-v/-q フラグや --log-level, config の log_level が未指定時にフォールバック" },
-]} />
+| 環境変数 | 型 | デフォルト | 説明 |
+|---------|-----|-----------|------|
+| `STARWEFT_GITHUB_TOKEN` | string | - | GitHub API 認証トークン。publish github コマンドで使用。最優先 |
+| `GITHUB_TOKEN` | string | - | GitHub API 認証トークン。STARWEFT_GITHUB_TOKEN が未設定時にフォールバック |
+| `GH_TOKEN` | string | - | GitHub API 認証トークン。上記 2 つが未設定時にフォールバック |
+| `STARWEFT_GITHUB_API_BASE_URL` | string | `https://api.github.com` | GitHub API のベース URL。GitHub Enterprise 等で変更する場合に使用 |
+| `STARWEFT_REGISTRY_SHARED_SECRET` | string | - | レジストリ認証用の共有シークレット。registry serve の --shared-secret フラグと同等 |
+| `RUST_LOG` | string | info | ログフィルタ。-v/-q フラグや --log-level, config の log_level が未指定時にフォールバック |
 
 ---
 

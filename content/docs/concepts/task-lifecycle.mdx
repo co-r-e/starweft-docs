@@ -132,17 +132,17 @@ queued ──▶ offered ──▶ accepted ──▶ running ──▶ submitte
   └──────────────────────────────────────────────────────────▶ failed
 ```
 
-<ApiTable data={[
-  { name: "queued", description: "タスクがキューに入り、Worker の割り当てを待機中" },
-  { name: "offered", description: "Worker に JoinOffer が送信された" },
-  { name: "accepted", description: "Worker が JoinAccept を返した" },
-  { name: "running", description: "OpenClaw bridge でタスクが実行中" },
-  { name: "submitted", description: "Worker が結果を提出し、評価待ち" },
-  { name: "completed", description: "タスクが正常に完了" },
-  { name: "failed", description: "タスクの実行が失敗" },
-  { name: "stopping", description: "StopOrder を受信し、停止処理中" },
-  { name: "stopped", description: "停止が完了" }
-]} />
+| ステータス | 説明 |
+|-----------|------|
+| `queued` | タスクがキューに入り、Worker の割り当てを待機中 |
+| `offered` | Worker に JoinOffer が送信された |
+| `accepted` | Worker が JoinAccept を返した |
+| `running` | OpenClaw bridge でタスクが実行中 |
+| `submitted` | Worker が結果を提出し、評価待ち |
+| `completed` | タスクが正常に完了 |
+| `failed` | タスクの実行が失敗 |
+| `stopping` | StopOrder を受信し、停止処理中 |
+| `stopped` | 停止が完了 |
 
 ### OpenClaw bridge による実行
 
