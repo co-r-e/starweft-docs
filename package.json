@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "tsx scripts/generate-search-index.ts && next build",
+    "build": "tsx scripts/generate-search-index.ts && tsx scripts/generate-sitemap.ts && tsx scripts/generate-llms-txt.ts && next build",
     "build:search": "tsx scripts/generate-search-index.ts",
     "start": "next start",
     "lint": "eslint .",

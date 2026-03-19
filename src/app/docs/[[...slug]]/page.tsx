@@ -9,6 +9,7 @@ import {
   getBreadcrumbs,
   getFirstPageSlug,
 } from "@/lib/docs/content";
+import { SITE_URL, SITE_NAME } from "@/lib/site";
 import { compileMdx } from "@/lib/docs/mdx";
 import { Breadcrumb } from "@/components/docs/Breadcrumb";
 import { PrevNextLinks } from "@/components/docs/PrevNextLinks";
@@ -32,6 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
       title: "Documentation | Starweft",
       description: "Starweft documentation and guides.",
+      alternates: { canonical: `${SITE_URL}/docs` },
     };
   }
 
@@ -41,13 +43,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const { title, description } = page.frontmatter;
+  const url = `${SITE_URL}/docs/${slug.join("/")}`;
 
   return {
     title: `${title} | Starweft Docs`,
     description,
+    alternates: { canonical: url },
     openGraph: {
       title: `${title} | Starweft Docs`,
       description,
+      url,
+      siteName: SITE_NAME,
       type: "article",
     },
   };
@@ -75,19 +81,31 @@ export default async function DocsPage({ params }: Props): Promise<ReactNode> {
   const showToc = frontmatter.toc !== false && toc.length > 0;
 
   // JSON-LD structured data for SEO
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://starweft.dev";
-  const jsonLd = JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "TechArticle",
-    headline: frontmatter.title,
-    description: frontmatter.description,
-    url: `${baseUrl}/docs/${slug.join("/")}`,
-    publisher: {
-      "@type": "Organization",
-      name: "Starweft",
-      url: baseUrl,
+  const pageUrl = `${SITE_URL}/docs/${slug.join("/")}`;
+  const jsonLd = JSON.stringify([
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      headline: frontmatter.title,
+      description: frontmatter.description,
+      url: pageUrl,
+      publisher: {
+        "@type": "Organization",
+        name: SITE_NAME,
+        url: SITE_URL,
+      },
     },
-  });
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: breadcrumbs.map((item, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        name: item.label,
+        ...(item.href ? { item: `${SITE_URL}${item.href}` } : {}),
+      })),
+    },
+  ]);
 
   return (
     <>

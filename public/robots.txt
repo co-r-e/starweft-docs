@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://starweft.dev/sitemap.xml
+Sitemap: https://co-r-e.github.io/starweft-docs/sitemap.xml
+
+# LLM-friendly documentation
+# See https://llmstxt.org/
+LLMs-Txt: https://co-r-e.github.io/starweft-docs/llms.txt

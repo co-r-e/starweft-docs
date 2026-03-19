@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { OsTabs } from "@/components/lp";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 
 /* ---------- shared style constants ---------- */
 
@@ -99,11 +101,71 @@ const faqItems = [
   },
 ];
 
+/* ---------- metadata ---------- */
+
+export const metadata: Metadata = {
+  alternates: { canonical: SITE_URL },
+};
+
+/* ---------- JSON-LD ---------- */
+
+const websiteJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: SITE_NAME,
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+});
+
+const faqJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqItems.map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.a,
+    },
+  })),
+});
+
+const softwareJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: SITE_NAME,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Linux, macOS, Windows",
+  description: SITE_DESCRIPTION,
+  url: "https://github.com/starweft/starweft",
+  license: "https://opensource.org/licenses/MIT",
+  programmingLanguage: "Rust",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+});
+
 /* ---------- page ---------- */
 
 export default function LandingPage(): ReactNode {
   return (
     <div className="min-h-screen bg-[var(--background)] font-[family-name:var(--font-figtree)] text-[var(--ink)]">
+      {/* JSON-LD structured data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: websiteJsonLd }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: faqJsonLd }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: softwareJsonLd }}
+      />
+
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[var(--line)] bg-[var(--background)]/80 px-4 backdrop-blur-lg lg:px-8">
         <span className="text-lg font-bold tracking-tight">Starweft</span>

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { Figtree } from "next/font/google";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -9,9 +10,21 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: "Starweft | Distributed Multi-Agent Task Coordination CLI",
-  description:
-    "Starweft is a P2P CLI tool for distributed multi-agent task coordination. Powered by Ed25519 signing, SQLite, and OpenClaw integration.",
+  metadataBase: new URL(SITE_URL),
+  title: `${SITE_NAME} | Distributed Multi-Agent Task Coordination CLI`,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    siteName: SITE_NAME,
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 interface RootLayoutProps {

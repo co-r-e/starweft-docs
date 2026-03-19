@@ -1,0 +1,46 @@
+# Starweft
+
+> Starweft is a P2P CLI tool for distributed multi-agent task coordination. Powered by Ed25519 signing, SQLite, and OpenClaw integration.
+
+Starweft is a distributed multi-agent task coordination CLI built in Rust.
+This documentation covers installation, architecture, guides, CLI reference, and security.
+
+## Documentation
+
+### Getting Started
+
+- [Introduction](https://co-r-e.github.io/starweft-docs/docs/getting-started/introduction)
+- [Installation](https://co-r-e.github.io/starweft-docs/docs/getting-started/installation)
+- [Quick Start](https://co-r-e.github.io/starweft-docs/docs/getting-started/quick-start)
+
+### Concepts
+
+- [Architecture](https://co-r-e.github.io/starweft-docs/docs/concepts/architecture)
+- [Roles](https://co-r-e.github.io/starweft-docs/docs/concepts/roles)
+- [Messages](https://co-r-e.github.io/starweft-docs/docs/concepts/messages)
+- [Task Lifecycle](https://co-r-e.github.io/starweft-docs/docs/concepts/task-lifecycle)
+
+### Guides
+
+- [Your First Vision](https://co-r-e.github.io/starweft-docs/docs/guides/first-vision)
+- [Multi-Machine Setup](https://co-r-e.github.io/starweft-docs/docs/guides/multi-machine)
+- [OpenClaw Integration](https://co-r-e.github.io/starweft-docs/docs/guides/openclaw)
+- [Configuration](https://co-r-e.github.io/starweft-docs/docs/guides/config)
+
+### Reference
+
+- [CLI Commands](https://co-r-e.github.io/starweft-docs/docs/reference/cli-commands)
+- [Configuration File](https://co-r-e.github.io/starweft-docs/docs/reference/config-file)
+- [Error Codes](https://co-r-e.github.io/starweft-docs/docs/reference/error-codes)
+- [Environment Variables](https://co-r-e.github.io/starweft-docs/docs/reference/env-vars)
+
+### Security
+
+- [Message Signing](https://co-r-e.github.io/starweft-docs/docs/security/signing)
+- [Key Management](https://co-r-e.github.io/starweft-docs/docs/security/key-management)
+- [Audit](https://co-r-e.github.io/starweft-docs/docs/security/audit)
+
+## Links
+
+- [Full documentation text](https://co-r-e.github.io/starweft-docs/llms-full.txt)
+- [GitHub](https://github.com/starweft/starweft)
