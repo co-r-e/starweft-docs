@@ -142,8 +142,10 @@ starweft run --data-dir ./demo/worker
 With all nodes running, submit a vision from the principal:
 
 ```bash
-starweft vision submit "Build a hello world REST API in Rust" \
-  --data-dir ./demo/principal
+starweft vision submit \
+  --data-dir ./demo/principal \
+  --title "Build a hello world REST API" \
+  --text "Build a Hello World REST API in Rust. Include a GET /health endpoint and verify behavior with tests."
 ```
 
 The owner will decompose this vision into tasks and distribute them to available workers.
@@ -156,10 +158,11 @@ Check the status of your project:
 starweft status --data-dir ./demo/principal
 ```
 
-View the task tree:
+View the task tree (check project ID with `project list` first):
 
 ```bash
-starweft project task tree --data-dir ./demo/principal
+starweft project list --data-dir ./demo/owner
+starweft task tree --data-dir ./demo/owner --project <PROJECT_ID>
 ```
 
 ## Next Steps

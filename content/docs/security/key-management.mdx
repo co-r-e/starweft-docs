@@ -187,7 +187,7 @@ At node startup, a `CapabilityQuery` message is broadcast, and public keys are a
 }
 ```
 
-Exchanged public keys are stored in the `peer_identities` table of the SQLite store and used for subsequent message signature verification.
+Exchanged public keys are stored in the `peer_keys` table of the SQLite store and used for subsequent message signature verification.
 
 <Callout type="warning">
 Automatic exchange is a convenience mechanism. In untrusted network environments, manual public key registration via `peer add` is recommended.

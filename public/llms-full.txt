@@ -156,7 +156,7 @@ When using the local_mailbox transport (the default on Unix), register peers man
 With libp2p transport and mDNS (v0.3.0), nodes on the same LAN are discovered automatically.
 No peer add commands are needed.
 
-Enable libp2p in each node's config.toml`:
+Enable libp2p in each node's config.toml:
 
 Simply starting the nodes is enough — they will automatically discover peers via mDNS and exchange CapabilityQuery/CapabilityAdvertisement messages.
 
@@ -176,7 +176,7 @@ Monitor Progress
 
 Check the status of your project:
 
-View the task tree:
+View the task tree (check project ID with project list` first):
 
 Next Steps
 
@@ -226,6 +226,19 @@ When using the libp2p transport, enabling mDNS allows automatic detection of pee
 
 mDNS is effective for discovering nodes within the same LAN. For communication across different networks, manually configure seed peers in discovery.seeds.
 
+NAT Traversal
+
+When using the libp2p transport, Starweft supports automatic NAT traversal to enable communication between nodes behind NAT.
+
+| Mechanism | Description |
+|-----------|-------------|
+| AutoNAT | Automatically detects whether the node is behind NAT by probing reachability from peers |
+| UPnP | Attempts to automatically open ports on the NAT gateway via UPnP |
+| Circuit Relay v2 | Routes traffic through a relay node when direct connection is not possible |
+| DCUtR | Direct Connection Upgrade through Relay — establishes a direct connection via hole-punching after initial relay connection |
+
+NAT traversal is enabled by default when using the libp2p transport. Set nat_traversal = false to disable it.
+
 Event Sourcing and SQLite WAL
 
 Starweft employs an event sourcing pattern. All protocol messages are recorded as immutable events in the task_events table, while projection tables (projects, tasks, task_results, etc.) provide the current state view.
@@ -240,6 +253,7 @@ Key table structure:
 | visions | Submitted visions |
 | projects | Project state (planning / active / stopping / stopped) |
 | tasks | Task state (queued → running → completed/failed/stopped) |
+| task_dependencies | Task dependency graph (depends_on relationships) |
 | task_events | Immutable log of all messages |
 | task_results | Summary of task execution results |
 | inbox_messages | Receive queue (with deduplication) |
@@ -424,7 +438,7 @@ With direct_preferred = true (default), direct addresses are prioritized over re
 
 Communication Flow Between Roles
 
-For details on configuring each role, see the Configuration Reference.
+For details on configuring each role, see the Configuration Guide.
 
 
 ---
@@ -616,6 +630,16 @@ Each task is configured with the following:
 - required_capability: The capability required for execution (e.g., "openclaw.execution.v1")
 - input_payload: Input data for the Worker (JSON)
 - expected_output_schema: JSON Schema describing the expected output
+
+Task Dependencies
+
+Tasks can declare explicit dependencies on other tasks using the depends_on field. The Owner respects these dependencies when scheduling task delegation.
+
+- Tasks in depends_on must complete before the dependent task is offered to a Worker
+- Cycle detection: The Owner validates the dependency graph at planning time and rejects cycles
+- Dependencies are stored in the task_dependencies table and visible via task tree
+
+The heuristic planner infers phase ordering from bullet point structure in the vision text. The OpenClaw planner can generate explicit depends_on relationships for more precise scheduling.
 
 JoinOffer / Accept Flow
 
@@ -984,6 +1008,38 @@ Disabling mDNS
 
 mDNS is disabled by default even when using the libp2p transport. It only operates when explicitly set to true.
 
+NAT Traversal
+
+Starweft supports automatic NAT traversal when using the libp2p transport. This enables nodes behind NAT to communicate without manual port forwarding.
+
+How It Works
+
+Starweft uses a layered approach to NAT traversal:
+
+AutoNAT Detection
+
+The node probes its reachability from peers to determine if it is behind NAT. If unreachable, NAT traversal mechanisms are activated automatically.
+
+UPnP Port Mapping
+
+If the NAT gateway supports UPnP, Starweft automatically requests a port mapping to make the node directly reachable.
+
+Circuit Relay v2
+
+When direct connection is not possible, traffic is routed through a relay node. This requires a relay node to be available and relay_enabled = true in the configuration.
+
+DCUtR Hole-Punching
+
+After initial relay connection, Starweft attempts Direct Connection Upgrade through Relay (DCUtR) to establish a direct peer-to-peer connection via hole-punching, removing the relay from the data path.
+
+Configuration
+
+NAT traversal is enabled by default when using the libp2p transport.
+
+To disable NAT traversal:
+
+For nodes on public IP addresses with no NAT, NAT traversal has no effect. It only activates when AutoNAT detects that the node is unreachable.
+
 Relay Node Configuration
 
 When nodes behind NAT cannot communicate directly with each other, messages can be relayed through a relay node.
@@ -1000,6 +1056,16 @@ Relay Settings
 
 - relay_enabled — Allow communication via relay (default: true)
 - direct_preferred — Prefer direct connections; use relay only when direct connection fails (default: true)
+
+Relay Server Settings
+
+Relay nodes can be fine-tuned with the [relay] configuration section.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| max_reservations | u32 | 128 | Maximum number of concurrent relay reservations |
+| max_circuits_per_peer | u32 | 4 | Maximum number of circuits a single peer can hold |
+| reservation_duration_sec | u64 | 3600 | Duration of a relay reservation in seconds |
 
 Seed Peer Configuration
 
@@ -1189,7 +1255,22 @@ Evaluation Strategy
 
 Evaluation upon task completion is controlled by the evaluator in the [observation] section.
 
-Currently, only heuristic is supported. Heuristic evaluation scores based on task success/failure, retry count, and error content.
+heuristic (default)
+
+Scores based on task success/failure, retry count, and error content. No external dependencies required.
+
+openclaw
+
+Uses the OpenClaw binary to evaluate task results with LLM-powered scoring. Falls back to heuristic evaluation on failure when evaluator_fallback_to_heuristic = true.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| evaluator_bin | null | OpenClaw binary for evaluation. Falls back to [openclaw].bin if not set |
+| evaluator_working_dir | null | Working directory for the evaluator |
+| evaluator_timeout_sec | 120 | Evaluator timeout in seconds |
+| evaluator_fallback_to_heuristic | true | Fall back to heuristic when OpenClaw evaluation fails |
+
+If evaluator_bin is not specified, the bin from the [openclaw] section is used. This allows you to share a single OpenClaw binary for both execution and evaluation.
 
 Next Steps
 
@@ -1275,6 +1356,7 @@ Settings for peer discovery and registry.
 | seeds | string[] | Multiaddresses of seed peers to connect to at startup |
 | auto_discovery | bool | Automatic exchange of CapabilityQuery/Advertisement (default: true) |
 | mdns | bool | Automatic discovery on the local network via mDNS (default: false) |
+| dns_seeds | string[] | DNS-based seed peer addresses (default: []) |
 | registry_url | string? | URL of the peer registry server |
 | registry_ttl_sec | u64 | TTL for registry registration in seconds (default: 300) |
 | registry_heartbeat_sec | u64 | Heartbeat interval to the registry in seconds (default: 60) |
@@ -1293,6 +1375,17 @@ Transport type and connection settings.
 | relay_enabled | bool | Allow communication via relay nodes (default: true) |
 | direct_preferred | bool | Prefer direct connections (default: true) |
 | max_peers | u16 | Maximum number of peers (default: 128) |
+| nat_traversal | bool | Enable NAT traversal (AutoNAT, UPnP, Circuit Relay v2, DCUtR). Default: true when libp2p |
+
+[relay] Section
+
+Settings specific to the relay role. Controls Circuit Relay v2 behavior.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| max_reservations | u32 | Maximum concurrent relay reservations (default: 128) |
+| max_circuits_per_peer | u32 | Maximum circuits per peer (default: 4) |
+| reservation_duration_sec | u64 | Reservation lifetime in seconds (default: 3600) |
 
 [openclaw] Section
 
@@ -1358,12 +1451,16 @@ Task planning and evaluation engine settings.
 | max_planned_tasks | usize | Maximum number of tasks generated from a single vision (default: 6) |
 | min_task_objective_chars | usize | Minimum character count for task objectives (default: 48) |
 | planner | string | heuristic / openclaw / openclaw_worker (default: heuristic) |
-| evaluator | string | heuristic (default: heuristic) |
+| evaluator | string | heuristic / openclaw (default: heuristic) |
 | planner_bin | string? | Binary path for the openclaw planner |
 | planner_working_dir | string? | Working directory for the planner |
 | planner_timeout_sec | u64 | Planner timeout in seconds (default: 120) |
 | planner_capability_version | string | Planner capability version (default: openclaw.plan.v1) |
 | planner_fallback_to_heuristic | bool | Fall back to heuristic when the OpenClaw planner fails (default: true) |
+| evaluator_bin | string? | Binary path for the openclaw evaluator |
+| evaluator_working_dir | string? | Working directory for the evaluator |
+| evaluator_timeout_sec | u64 | Evaluator timeout in seconds (default: 120) |
+| evaluator_fallback_to_heuristic | bool | Fall back to heuristic when OpenClaw evaluation fails (default: true) |
 
 [logs] Section
 
@@ -1440,6 +1537,7 @@ Global flags available for all subcommands.
 |-------|-----|-----------|------|
 | -v, --verbose | count | 0 | Increase log output (-v: debug, -vv: trace) |
 | -q, --quiet | count | 0 | Decrease log output (-q: warn, -qq: error). Mutually exclusive with --verbose |
+| --color | auto \| always \| never | auto | Control colored output |
 
 ---
 
@@ -1539,8 +1637,8 @@ Sends a vision to the owner and initiates task decomposition. Principal role onl
 |-------|-----|-----------|------|
 | --data-dir | path | ~/.starweft | Path to the data directory |
 | --title | string | - | Required. Title of the vision |
-| --text | string | - | Text body of the vision. Mutually exclusive with --file |
-| --file | path | - | File to read the vision text from. Mutually exclusive with --text |
+| --text | string | - | Text body of the vision (max 1 MB). Mutually exclusive with --file |
+| --file | path | - | File to read the vision text from (max 1 MB). Mutually exclusive with --text |
 | --constraint | key=value[] | - | Constraints (multiple can be specified: budget_mode, human_intervention, allow_external_agents) |
 | --owner | string | auto-resolved | Actor ID of the target owner |
 | --dry-run | bool | false | Run planning preview only |
@@ -1638,7 +1736,7 @@ Issues a stop order for a project or task tree. Principal role only.
 | --data-dir | path | ~/.starweft | Path to the data directory |
 | --project | string | - | Project ID to stop. Mutually exclusive with --task-tree |
 | --task-tree | string | - | Root ID of the task tree to stop. Mutually exclusive with --project |
-| --reason-code | string | - | Required. Stop reason code |
+| --reason-code | string | - | Required. Stop reason code (e.g., cancelled, completed, error, budget_exceeded) |
 | --reason | string | - | Required. Stop reason text |
 | --yes | bool | false | Required. Confirm the stop operation |
 | --json | bool | false | Output in JSON format |
@@ -1667,6 +1765,7 @@ The valid values for --until depend on the scope.
 
 - --vision: project_created, active, stopped
 - --project: available, active, approval_applied, stopping, stopped
+- --task: available, approval_applied, terminal, or any task status (queued, offered, accepted, running, submitted, completed, failed, stopping, stopped)
 - --stop: ordered, stopping, stopped
 
 Specify only one of --vision, --project, --task, or --stop.
@@ -1848,6 +1947,7 @@ Restores data from a backup bundle.
 | --data-dir | path | ~/.starweft | Path to the restore destination data directory |
 | --input | path | - | Required. Path to the backup bundle |
 | --force | bool | false | Force restore even if identities do not match |
+| --yes | bool | false | Skip confirmation prompt |
 
 Restoring a backup from a different node requires the --force flag. An [E_BACKUP_IDENTITY_MISMATCH] error is raised when an identity mismatch is detected.
 
@@ -1878,6 +1978,11 @@ Lists undeliverable messages (dead letters).
 repair reconcile-running-tasks
 
 Transitions tasks that remain in the running state after a runtime shutdown to a stopped state.
+
+| Flag | Type | Default | Description |
+|-------|-----|-----------|------|
+| --data-dir | path | ~/.starweft | Path to the data directory |
+| --yes | bool | false | Execute repair (skips confirmation prompt) |
 
 ---
 
@@ -2042,6 +2147,7 @@ Peer discovery settings.
 | seeds | string[] | [] | List of initial peer multiaddresses to connect to |
 | auto_discovery | bool | true | Enable automatic discovery from peers |
 | mdns | bool | true when libp2p | mDNS local network discovery (added in v0.3.0; default when transport=libp2p) |
+| dns_seeds | string[] | [] | DNS-based seed peer addresses |
 | registry_url | string \| null | null | URL of the registry server |
 | registry_ttl_sec | u64 | 300 | TTL for registry entries (seconds) |
 | registry_heartbeat_sec | u64 | 60 | Heartbeat interval for the registry (seconds) |
@@ -2062,6 +2168,19 @@ P2P transport settings.
 | relay_enabled | bool | true | Enable communication via relay nodes |
 | direct_preferred | bool | true | Prefer direct connections |
 | max_peers | u16 | 128 | Maximum number of connectable peers |
+| nat_traversal | bool | true (libp2p) | Enable NAT traversal (AutoNAT, UPnP, Circuit Relay v2, DCUtR) |
+
+---
+
+[relay]
+
+Settings specific to the relay role. Controls Circuit Relay v2 behavior.
+
+| Field | Type | Default | Description |
+|-----------|-----|-----------|------|
+| max_reservations | u32 | 128 | Maximum number of concurrent relay reservations |
+| max_circuits_per_peer | u32 | 4 | Maximum number of circuits a single peer can hold |
+| reservation_duration_sec | u64 | 3600 | Reservation lifetime in seconds |
 
 ---
 
@@ -2156,7 +2275,7 @@ Planning and evaluation settings. Used when the owner role decomposes visions in
 | Field | Type | Default | Description |
 |-----------|-----|-----------|------|
 | planner | string | "heuristic" | Planning strategy. One of: heuristic / openclaw / openclaw_worker |
-| evaluator | string | "heuristic" | Evaluation strategy. Currently only heuristic is supported |
+| evaluator | string | "heuristic" | Evaluation strategy. One of: heuristic / openclaw |
 | cache_snapshots | bool | true | Cache snapshots |
 | cache_ttl_sec | u64 | 30 | Cache TTL (seconds) |
 | max_planned_tasks | usize | 6 | Maximum number of tasks generated from a single vision |
@@ -2166,6 +2285,10 @@ Planning and evaluation settings. Used when the owner role decomposes visions in
 | planner_timeout_sec | u64 | 120 | Planner timeout (seconds) |
 | planner_capability_version | string | "openclaw.plan.v1" | Capability version for the planner |
 | planner_fallback_to_heuristic | bool | true | Fall back to heuristic when the OpenClaw planner fails |
+| evaluator_bin | string \| null | null | OpenClaw binary for the evaluator (when using openclaw strategy) |
+| evaluator_working_dir | string \| null | null | Working directory for the evaluator |
+| evaluator_timeout_sec | u64 | 120 | Evaluator timeout (seconds) |
+| evaluator_fallback_to_heuristic | bool | true | Fall back to heuristic when the OpenClaw evaluator fails |
 
 | Strategy | Execution Location | Description |
 |---|---|---|
@@ -2472,6 +2595,46 @@ Cause: The peer's public key needed to verify the received message's signature i
 Resolution:
 - Register the peer's public key with starweft peer add
 
+E_PROTOCOL
+
+Message: Protocol error / Unexpected message type
+
+Cause: A protocol-level error occurred during message processing, such as receiving an unexpected message type for the current state.
+
+Resolution:
+- Verify that all nodes are running compatible versions
+- Check starweft events for detailed message flow
+
+E_INVALID_DELIVERY_STATE
+
+Message: Invalid delivery state transition
+
+Cause: An outbox message attempted an invalid state transition during delivery processing.
+
+Resolution:
+- Run starweft repair resume-outbox to re-queue pending messages
+- Check starweft repair list-dead-letters for messages that could not be delivered
+
+E_OUTBOX_DELIVERY_TARGET
+
+Message: Delivery target not found
+
+Cause: The target peer for message delivery could not be resolved from the peer store.
+
+Resolution:
+- Register the target peer with starweft peer add
+- Verify peer registration with starweft peer list
+
+E_OUTBOX_MESSAGE
+
+Message: Outbox message error
+
+Cause: An error occurred while processing an outbox message for delivery.
+
+Resolution:
+- Run starweft repair resume-outbox to retry failed deliveries
+- Check starweft repair list-dead-letters for permanently failed messages
+
 E_INVALID_MULTIADDR
 
 Message: Invalid listen/discovery configuration / : 
@@ -2600,6 +2763,15 @@ Resolution:
 
 Audit Errors
 
+E_AUDIT_KEY_MISSING
+
+Message: Public key not found for actor
+
+Cause: The public key required to verify an event's signature is not registered in the local store.
+
+Resolution:
+- Register the missing peer's public key with starweft peer add
+
 E_AUDIT_FAILED
 
 Message: Inconsistencies found in task_events
@@ -2658,6 +2830,32 @@ Resolution:
 
 ---
 
+Planner and Evaluator Errors
+
+E_PLANNER
+
+Message: Planner failed / Planner output parse error
+
+Cause: The OpenClaw planner subprocess failed or returned invalid output.
+
+Resolution:
+- Verify that the planner binary exists at the configured path
+- Check observation.planner_bin in config.toml
+- If planner_fallback_to_heuristic = true, the heuristic planner will be used as a fallback
+
+E_EVALUATOR
+
+Message: Evaluator failed / Evaluator output parse error
+
+Cause: The OpenClaw evaluator subprocess failed or returned invalid output.
+
+Resolution:
+- Verify that the evaluator binary exists at the configured path
+- Check observation.evaluator_bin in config.toml
+- If evaluator_fallback_to_heuristic = true, the heuristic evaluator will be used as a fallback
+
+---
+
 GitHub Publish Errors
 
 E_GITHUB_TOKEN_MISSING
@@ -2669,6 +2867,16 @@ Cause: No GitHub API authentication token is set in the environment variables.
 Resolution:
 - Set one of STARWEFT_GITHUB_TOKEN, GITHUB_TOKEN, or GH_TOKEN
 - See the Environment Variables reference for details
+
+E_GITHUB_API_BASE_URL
+
+Message: GitHub API base URL must use HTTPS (except for localhost)
+
+Cause: The STARWEFT_GITHUB_API_BASE_URL environment variable is set to a non-HTTPS URL that is not localhost.
+
+Resolution:
+- Use an HTTPS URL for the GitHub API base URL
+- HTTP is only permitted for localhost / 127.0.0.1 (for testing purposes)
 
 E_GITHUB_PUBLISH_FAILED
 
@@ -2694,6 +2902,21 @@ Resolution:
 - Check probe details (reasons, warnings) with starweft status --json
 - Verify that the node started successfully using starweft logs
 
+---
+
+Internal Errors
+
+E_INTERNAL
+
+Message: Internal state inconsistency / various internal error messages
+
+Cause: An unexpected internal state was encountered during processing.
+
+Resolution:
+- Run starweft repair reconcile-running-tasks to fix inconsistent task states
+- Run starweft repair rebuild-projections to rebuild projection tables from the event log
+- If the issue persists, check starweft logs for additional context
+
 
 ---
 
@@ -2711,11 +2934,13 @@ Environment Variables List
 
 | Environment Variable | Type | Default | Description |
 |---------|-----|-----------|------|
+| STARWEFT_DATA_DIR | string | ~/.starweft | Default data directory. Overridden by the --data-dir CLI flag |
 | STARWEFT_GITHUB_TOKEN | string | - | GitHub API authentication token. Used by the publish github command. Highest priority |
 | GITHUB_TOKEN | string | - | GitHub API authentication token. Fallback when STARWEFT_GITHUB_TOKEN is not set |
 | GH_TOKEN | string | - | GitHub API authentication token. Fallback when the above two are not set |
-| STARWEFT_GITHUB_API_BASE_URL | string | https://api.github.com | Base URL for the GitHub API. Used when connecting to GitHub Enterprise, etc. |
+| STARWEFT_GITHUB_API_BASE_URL | string | https://api.github.com | Base URL for the GitHub API. Must use HTTPS (except for localhost). Used when connecting to GitHub Enterprise |
 | STARWEFT_REGISTRY_SHARED_SECRET | string | - | Shared secret for registry authentication. Equivalent to the --shared-secret flag of registry serve |
+| STARWEFT_INSTALL_DIR | string | /usr/local/bin | Installation directory used by the curl install script |
 | RUST_LOG | string | info | Log filter. Fallback when -v/-q flags, --log-level, and the config log_level are not specified |
 
 ---
@@ -2778,9 +3003,17 @@ If none are set, the info level is used.
 
 ---
 
+Data Directory
+
+The STARWEFT_DATA_DIR environment variable sets the default data directory for all commands. It is equivalent to specifying --data-dir on the command line. The CLI flag takes precedence over the environment variable.
+
+---
+
 GitHub Enterprise Support
 
 Setting STARWEFT_GITHUB_API_BASE_URL allows you to use a GitHub Enterprise Server API endpoint.
+
+The API base URL must use HTTPS. HTTP is only permitted for localhost and 127.0.0.1 (for testing purposes). An [E_GITHUB_API_BASE_URL] error is raised for non-HTTPS URLs.
 
 A trailing slash is automatically removed.
 
@@ -2977,7 +3210,7 @@ Automatic Exchange: CapabilityQuery / CapabilityAdvertisement
 
 At node startup, a CapabilityQuery message is broadcast, and public keys are automatically exchanged when a CapabilityAdvertisement response is received.
 
-Exchanged public keys are stored in the peer_identities table of the SQLite store and used for subsequent message signature verification.
+Exchanged public keys are stored in the peer_keys table of the SQLite store and used for subsequent message signature verification.
 
 Automatic exchange is a convenience mechanism. In untrusted network environments, manual public key registration via peer add is recommended.
 

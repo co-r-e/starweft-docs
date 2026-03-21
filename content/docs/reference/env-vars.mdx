@@ -13,11 +13,13 @@ This is a list of environment variables that affect Starweft's behavior. Starwef
 
 | Environment Variable | Type | Default | Description |
 |---------|-----|-----------|------|
+| `STARWEFT_DATA_DIR` | string | `~/.starweft` | Default data directory. Overridden by the `--data-dir` CLI flag |
 | `STARWEFT_GITHUB_TOKEN` | string | - | GitHub API authentication token. Used by the publish github command. Highest priority |
 | `GITHUB_TOKEN` | string | - | GitHub API authentication token. Fallback when STARWEFT_GITHUB_TOKEN is not set |
 | `GH_TOKEN` | string | - | GitHub API authentication token. Fallback when the above two are not set |
-| `STARWEFT_GITHUB_API_BASE_URL` | string | `https://api.github.com` | Base URL for the GitHub API. Used when connecting to GitHub Enterprise, etc. |
+| `STARWEFT_GITHUB_API_BASE_URL` | string | `https://api.github.com` | Base URL for the GitHub API. Must use HTTPS (except for localhost). Used when connecting to GitHub Enterprise |
 | `STARWEFT_REGISTRY_SHARED_SECRET` | string | - | Shared secret for registry authentication. Equivalent to the --shared-secret flag of registry serve |
+| `STARWEFT_INSTALL_DIR` | string | `/usr/local/bin` | Installation directory used by the curl install script |
 | `RUST_LOG` | string | info | Log filter. Fallback when -v/-q flags, --log-level, and the config log_level are not specified |
 
 ---
@@ -123,6 +125,17 @@ RUST_LOG="starweft=debug,starweft_p2p=trace" starweft run
 
 ---
 
+## Data Directory
+
+The `STARWEFT_DATA_DIR` environment variable sets the default data directory for all commands. It is equivalent to specifying `--data-dir` on the command line. The CLI flag takes precedence over the environment variable.
+
+```bash
+export STARWEFT_DATA_DIR=~/my-starweft-data
+starweft status  # Uses ~/my-starweft-data
+```
+
+---
+
 ## GitHub Enterprise Support
 
 Setting `STARWEFT_GITHUB_API_BASE_URL` allows you to use a GitHub Enterprise Server API endpoint.
@@ -133,6 +146,10 @@ export STARWEFT_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
 
 starweft publish github --repo org/repo --issue 42
 ```
+
+<Callout type="warning">
+The API base URL must use HTTPS. HTTP is only permitted for `localhost` and `127.0.0.1` (for testing purposes). An `[E_GITHUB_API_BASE_URL]` error is raised for non-HTTPS URLs.
+</Callout>
 
 <Callout type="info">
 A trailing slash is automatically removed.

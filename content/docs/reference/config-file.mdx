@@ -78,6 +78,7 @@ Peer discovery settings.
 | `seeds` | string[] | `[]` | List of initial peer multiaddresses to connect to |
 | `auto_discovery` | bool | `true` | Enable automatic discovery from peers |
 | `mdns` | bool | true when libp2p | mDNS local network discovery (added in v0.3.0; default when transport=libp2p) |
+| `dns_seeds` | string[] | `[]` | DNS-based seed peer addresses |
 | `registry_url` | string \| null | null | URL of the registry server |
 | `registry_ttl_sec` | u64 | `300` | TTL for registry entries (seconds) |
 | `registry_heartbeat_sec` | u64 | `60` | Heartbeat interval for the registry (seconds) |
@@ -110,6 +111,7 @@ P2P transport settings.
 | `relay_enabled` | bool | `true` | Enable communication via relay nodes |
 | `direct_preferred` | bool | `true` | Prefer direct connections |
 | `max_peers` | u16 | `128` | Maximum number of connectable peers |
+| `nat_traversal` | bool | `true` (libp2p) | Enable NAT traversal (AutoNAT, UPnP, Circuit Relay v2, DCUtR) |
 
 ```toml
 [p2p]
@@ -117,6 +119,26 @@ transport = "local_mailbox"
 relay_enabled = true
 direct_preferred = true
 max_peers = 128
+nat_traversal = true
+```
+
+---
+
+## [relay]
+
+Settings specific to the **relay** role. Controls Circuit Relay v2 behavior.
+
+| Field | Type | Default | Description |
+|-----------|-----|-----------|------|
+| `max_reservations` | u32 | `128` | Maximum number of concurrent relay reservations |
+| `max_circuits_per_peer` | u32 | `4` | Maximum number of circuits a single peer can hold |
+| `reservation_duration_sec` | u64 | `3600` | Reservation lifetime in seconds |
+
+```toml
+[relay]
+max_reservations = 128
+max_circuits_per_peer = 4
+reservation_duration_sec = 3600
 ```
 
 ---
@@ -173,7 +195,7 @@ Controls protocol and schema version compatibility.
 ```toml
 [compatibility]
 protocol_version = "starweft/0.1"
-schema_version = "starweft-store/3"
+schema_version = "starweft-store/5"
 bridge_capability_version = "openclaw.execution.v1"
 allow_legacy_protocols = false
 ```
@@ -268,7 +290,7 @@ Planning and evaluation settings. Used when the owner role decomposes visions in
 | Field | Type | Default | Description |
 |-----------|-----|-----------|------|
 | `planner` | string | `"heuristic"` | Planning strategy. One of: heuristic / openclaw / openclaw_worker |
-| `evaluator` | string | `"heuristic"` | Evaluation strategy. Currently only heuristic is supported |
+| `evaluator` | string | `"heuristic"` | Evaluation strategy. One of: heuristic / openclaw |
 | `cache_snapshots` | bool | `true` | Cache snapshots |
 | `cache_ttl_sec` | u64 | `30` | Cache TTL (seconds) |
 | `max_planned_tasks` | usize | `6` | Maximum number of tasks generated from a single vision |
@@ -278,6 +300,10 @@ Planning and evaluation settings. Used when the owner role decomposes visions in
 | `planner_timeout_sec` | u64 | `120` | Planner timeout (seconds) |
 | `planner_capability_version` | string | `"openclaw.plan.v1"` | Capability version for the planner |
 | `planner_fallback_to_heuristic` | bool | `true` | Fall back to heuristic when the OpenClaw planner fails |
+| `evaluator_bin` | string \| null | null | OpenClaw binary for the evaluator (when using openclaw strategy) |
+| `evaluator_working_dir` | string \| null | null | Working directory for the evaluator |
+| `evaluator_timeout_sec` | u64 | `120` | Evaluator timeout (seconds) |
+| `evaluator_fallback_to_heuristic` | bool | `true` | Fall back to heuristic when the OpenClaw evaluator fails |
 
 ```toml
 [observation]
@@ -290,6 +316,8 @@ min_task_objective_chars = 48
 planner_timeout_sec = 120
 planner_capability_version = "openclaw.plan.v1"
 planner_fallback_to_heuristic = true
+evaluator_timeout_sec = 120
+evaluator_fallback_to_heuristic = true
 ```
 
 <Accordion title="Comparison of planner strategies">
@@ -363,6 +391,7 @@ transport = "local_mailbox"
 relay_enabled = true
 direct_preferred = true
 max_peers = 128
+nat_traversal = true
 
 [ledger]
 path = "~/.starweft-worker/ledger/node.db"
@@ -392,6 +421,7 @@ planner = "heuristic"
 evaluator = "heuristic"
 cache_snapshots = true
 cache_ttl_sec = 30
+evaluator_fallback_to_heuristic = true
 
 [logs]
 rotate_max_bytes = 1048576

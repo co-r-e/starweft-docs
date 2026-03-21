@@ -216,6 +216,7 @@ The Owner delegates a task to a Worker. Includes input data and the expected out
 ```rust
 pub struct TaskDelegated {
     pub parent_task_id: Option<TaskId>, // Parent task (if this is a subtask)
+    pub depends_on: Vec<TaskId>,        // Task dependency graph
     pub title: String,
     pub description: String,
     pub objective: String,

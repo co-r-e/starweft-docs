@@ -56,6 +56,7 @@ config.toml
 ├── [identity]       — Key file paths
 ├── [discovery]      — Peer discovery, mDNS, registry
 ├── [p2p]            — Transport settings
+├── [relay]          — Relay node settings
 ├── [ledger]         — SQLite database path
 ├── [openclaw]       — OpenClaw bridge settings
 ├── [compatibility]  — Protocol version
@@ -133,6 +134,7 @@ registry_heartbeat_sec = 60
 | `seeds` | string[] | Multiaddresses of seed peers to connect to at startup |
 | `auto_discovery` | bool | Automatic exchange of CapabilityQuery/Advertisement (default: true) |
 | `mdns` | bool | Automatic discovery on the local network via mDNS (default: false) |
+| `dns_seeds` | string[] | DNS-based seed peer addresses (default: []) |
 | `registry_url` | string? | URL of the peer registry server |
 | `registry_ttl_sec` | u64 | TTL for registry registration in seconds (default: 300) |
 | `registry_heartbeat_sec` | u64 | Heartbeat interval to the registry in seconds (default: 60) |
@@ -153,6 +155,7 @@ transport = "local_mailbox"
 relay_enabled = true
 direct_preferred = true
 max_peers = 128
+nat_traversal = true
 ```
 
 | Field | Type | Description |
@@ -161,6 +164,24 @@ max_peers = 128
 | `relay_enabled` | bool | Allow communication via relay nodes (default: true) |
 | `direct_preferred` | bool | Prefer direct connections (default: true) |
 | `max_peers` | u16 | Maximum number of peers (default: 128) |
+| `nat_traversal` | bool | Enable NAT traversal (AutoNAT, UPnP, Circuit Relay v2, DCUtR). Default: true when libp2p |
+
+## `[relay]` Section
+
+Settings specific to the **relay** role. Controls Circuit Relay v2 behavior.
+
+```toml
+[relay]
+max_reservations = 128
+max_circuits_per_peer = 4
+reservation_duration_sec = 3600
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `max_reservations` | u32 | Maximum concurrent relay reservations (default: 128) |
+| `max_circuits_per_peer` | u32 | Maximum circuits per peer (default: 4) |
+| `reservation_duration_sec` | u64 | Reservation lifetime in seconds (default: 3600) |
 
 ## `[openclaw]` Section
 
@@ -190,7 +211,7 @@ Protocol version and schema version settings.
 ```toml
 [compatibility]
 protocol_version = "starweft/0.1"
-schema_version = "starweft-store/2"
+schema_version = "starweft-store/5"
 bridge_capability_version = "openclaw.execution.v1"
 allow_legacy_protocols = false
 ```
@@ -279,6 +300,10 @@ planner_working_dir = ""
 planner_timeout_sec = 120
 planner_capability_version = "openclaw.plan.v1"
 planner_fallback_to_heuristic = true
+evaluator_bin = ""
+evaluator_working_dir = ""
+evaluator_timeout_sec = 120
+evaluator_fallback_to_heuristic = true
 ```
 
 | Field | Type | Description |
@@ -288,12 +313,16 @@ planner_fallback_to_heuristic = true
 | `max_planned_tasks` | usize | Maximum number of tasks generated from a single vision (default: 6) |
 | `min_task_objective_chars` | usize | Minimum character count for task objectives (default: 48) |
 | `planner` | string | heuristic / openclaw / openclaw_worker (default: heuristic) |
-| `evaluator` | string | heuristic (default: heuristic) |
+| `evaluator` | string | heuristic / openclaw (default: heuristic) |
 | `planner_bin` | string? | Binary path for the openclaw planner |
 | `planner_working_dir` | string? | Working directory for the planner |
 | `planner_timeout_sec` | u64 | Planner timeout in seconds (default: 120) |
 | `planner_capability_version` | string | Planner capability version (default: openclaw.plan.v1) |
 | `planner_fallback_to_heuristic` | bool | Fall back to heuristic when the OpenClaw planner fails (default: true) |
+| `evaluator_bin` | string? | Binary path for the openclaw evaluator |
+| `evaluator_working_dir` | string? | Working directory for the evaluator |
+| `evaluator_timeout_sec` | u64 | Evaluator timeout in seconds (default: 120) |
+| `evaluator_fallback_to_heuristic` | bool | Fall back to heuristic when OpenClaw evaluation fails (default: true) |
 
 ## `[logs]` Section
 

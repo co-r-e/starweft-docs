@@ -11,6 +11,7 @@ Global flags available for all subcommands.
 |-------|-----|-----------|------|
 | `-v, --verbose` | count | `0` | Increase log output (-v: debug, -vv: trace) |
 | `-q, --quiet` | count | `0` | Decrease log output (-q: warn, -qq: error). Mutually exclusive with --verbose |
+| `--color` | auto \| always \| never | `auto` | Control colored output |
 
 ---
 
@@ -164,8 +165,8 @@ starweft vision submit --title <TITLE> [OPTIONS]
 |-------|-----|-----------|------|
 | `--data-dir` | path | `~/.starweft` | Path to the data directory |
 | `--title` | string | - | Required. Title of the vision |
-| `--text` | string | - | Text body of the vision. Mutually exclusive with --file |
-| `--file` | path | - | File to read the vision text from. Mutually exclusive with --text |
+| `--text` | string | - | Text body of the vision (max 1 MB). Mutually exclusive with --file |
+| `--file` | path | - | File to read the vision text from (max 1 MB). Mutually exclusive with --text |
 | `--constraint` | key=value[] | - | Constraints (multiple can be specified: budget_mode, human_intervention, allow_external_agents) |
 | `--owner` | string | auto-resolved | Actor ID of the target owner |
 | `--dry-run` | bool | `false` | Run planning preview only |
@@ -311,7 +312,7 @@ starweft stop --reason-code <CODE> --reason <TEXT> --yes [OPTIONS]
 | `--data-dir` | path | `~/.starweft` | Path to the data directory |
 | `--project` | string | - | Project ID to stop. Mutually exclusive with --task-tree |
 | `--task-tree` | string | - | Root ID of the task tree to stop. Mutually exclusive with --project |
-| `--reason-code` | string | - | Required. Stop reason code |
+| `--reason-code` | string | - | Required. Stop reason code (e.g., `cancelled`, `completed`, `error`, `budget_exceeded`) |
 | `--reason` | string | - | Required. Stop reason text |
 | `--yes` | bool | `false` | Required. Confirm the stop operation |
 | `--json` | bool | `false` | Output in JSON format |
@@ -355,6 +356,7 @@ The valid values for `--until` depend on the scope.
 
 - **`--vision`**: `project_created`, `active`, `stopped`
 - **`--project`**: `available`, `active`, `approval_applied`, `stopping`, `stopped`
+- **`--task`**: `available`, `approval_applied`, `terminal`, or any task status (`queued`, `offered`, `accepted`, `running`, `submitted`, `completed`, `failed`, `stopping`, `stopped`)
 - **`--stop`**: `ordered`, `stopping`, `stopped`
 
 </Accordion>
@@ -598,6 +600,7 @@ starweft backup restore --input <PATH> [OPTIONS]
 | `--data-dir` | path | `~/.starweft` | Path to the restore destination data directory |
 | `--input` | path | - | Required. Path to the backup bundle |
 | `--force` | bool | `false` | Force restore even if identities do not match |
+| `--yes` | bool | `false` | Skip confirmation prompt |
 
 <Callout type="warning">
 Restoring a backup from a different node requires the `--force` flag. An `[E_BACKUP_IDENTITY_MISMATCH]` error is raised when an identity mismatch is detected.
@@ -644,8 +647,13 @@ starweft repair list-dead-letters [OPTIONS]
 Transitions tasks that remain in the running state after a runtime shutdown to a stopped state.
 
 ```bash
-starweft repair reconcile-running-tasks [--data-dir <PATH>]
+starweft repair reconcile-running-tasks [--data-dir <PATH>] [--yes]
 ```
+
+| Flag | Type | Default | Description |
+|-------|-----|-----------|------|
+| `--data-dir` | path | `~/.starweft` | Path to the data directory |
+| `--yes` | bool | `false` | Execute repair (skips confirmation prompt) |
 
 ---
 

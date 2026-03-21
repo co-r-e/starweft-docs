@@ -304,12 +304,38 @@ A non-zero exit code is reported to Starweft as an `openclaw process failed` err
 
 Evaluation upon task completion is controlled by the `evaluator` in the `[observation]` section.
 
+### heuristic (default)
+
+Scores based on task success/failure, retry count, and error content. No external dependencies required.
+
 ```toml
 [observation]
 evaluator = "heuristic"
 ```
 
-Currently, only `heuristic` is supported. Heuristic evaluation scores based on task success/failure, retry count, and error content.
+### openclaw
+
+Uses the OpenClaw binary to evaluate task results with LLM-powered scoring. Falls back to heuristic evaluation on failure when `evaluator_fallback_to_heuristic = true`.
+
+```toml
+[observation]
+evaluator = "openclaw"
+evaluator_bin = "/usr/local/bin/openclaw"
+evaluator_working_dir = "/home/user/workspace"
+evaluator_timeout_sec = 120
+evaluator_fallback_to_heuristic = true
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `evaluator_bin` | null | OpenClaw binary for evaluation. Falls back to `[openclaw].bin` if not set |
+| `evaluator_working_dir` | null | Working directory for the evaluator |
+| `evaluator_timeout_sec` | `120` | Evaluator timeout in seconds |
+| `evaluator_fallback_to_heuristic` | `true` | Fall back to heuristic when OpenClaw evaluation fails |
+
+<Callout type="info">
+If `evaluator_bin` is not specified, the `bin` from the `[openclaw]` section is used. This allows you to share a single OpenClaw binary for both execution and evaluation.
+</Callout>
 
 ## Next Steps
 

@@ -268,6 +268,46 @@ Common messages:
 **Resolution**:
 - Register the peer's public key with `starweft peer add`
 
+### E_PROTOCOL
+
+**Message**: `Protocol error` / `Unexpected message type`
+
+**Cause**: A protocol-level error occurred during message processing, such as receiving an unexpected message type for the current state.
+
+**Resolution**:
+- Verify that all nodes are running compatible versions
+- Check `starweft events` for detailed message flow
+
+### E_INVALID_DELIVERY_STATE
+
+**Message**: `Invalid delivery state transition`
+
+**Cause**: An outbox message attempted an invalid state transition during delivery processing.
+
+**Resolution**:
+- Run `starweft repair resume-outbox` to re-queue pending messages
+- Check `starweft repair list-dead-letters` for messages that could not be delivered
+
+### E_OUTBOX_DELIVERY_TARGET
+
+**Message**: `Delivery target not found`
+
+**Cause**: The target peer for message delivery could not be resolved from the peer store.
+
+**Resolution**:
+- Register the target peer with `starweft peer add`
+- Verify peer registration with `starweft peer list`
+
+### E_OUTBOX_MESSAGE
+
+**Message**: `Outbox message error`
+
+**Cause**: An error occurred while processing an outbox message for delivery.
+
+**Resolution**:
+- Run `starweft repair resume-outbox` to retry failed deliveries
+- Check `starweft repair list-dead-letters` for permanently failed messages
+
 ### E_INVALID_MULTIADDR
 
 **Message**: `Invalid listen/discovery configuration` / `<addr>: <error>`
@@ -396,6 +436,15 @@ Common messages:
 
 ## Audit Errors
 
+### E_AUDIT_KEY_MISSING
+
+**Message**: `Public key not found for actor`
+
+**Cause**: The public key required to verify an event's signature is not registered in the local store.
+
+**Resolution**:
+- Register the missing peer's public key with `starweft peer add`
+
 ### E_AUDIT_FAILED
 
 **Message**: `Inconsistencies found in task_events`
@@ -454,6 +503,32 @@ Common messages:
 
 ---
 
+## Planner and Evaluator Errors
+
+### E_PLANNER
+
+**Message**: `Planner failed` / `Planner output parse error`
+
+**Cause**: The OpenClaw planner subprocess failed or returned invalid output.
+
+**Resolution**:
+- Verify that the planner binary exists at the configured path
+- Check `observation.planner_bin` in `config.toml`
+- If `planner_fallback_to_heuristic = true`, the heuristic planner will be used as a fallback
+
+### E_EVALUATOR
+
+**Message**: `Evaluator failed` / `Evaluator output parse error`
+
+**Cause**: The OpenClaw evaluator subprocess failed or returned invalid output.
+
+**Resolution**:
+- Verify that the evaluator binary exists at the configured path
+- Check `observation.evaluator_bin` in `config.toml`
+- If `evaluator_fallback_to_heuristic = true`, the heuristic evaluator will be used as a fallback
+
+---
+
 ## GitHub Publish Errors
 
 ### E_GITHUB_TOKEN_MISSING
@@ -465,6 +540,16 @@ Common messages:
 **Resolution**:
 - Set one of `STARWEFT_GITHUB_TOKEN`, `GITHUB_TOKEN`, or `GH_TOKEN`
 - See the [Environment Variables reference](/docs/reference/env-vars) for details
+
+### E_GITHUB_API_BASE_URL
+
+**Message**: `GitHub API base URL must use HTTPS (except for localhost)`
+
+**Cause**: The `STARWEFT_GITHUB_API_BASE_URL` environment variable is set to a non-HTTPS URL that is not localhost.
+
+**Resolution**:
+- Use an HTTPS URL for the GitHub API base URL
+- HTTP is only permitted for `localhost` / `127.0.0.1` (for testing purposes)
 
 ### E_GITHUB_PUBLISH_FAILED
 
@@ -489,3 +574,18 @@ Common messages:
 **Resolution**:
 - Check probe details (reasons, warnings) with `starweft status --json`
 - Verify that the node started successfully using `starweft logs`
+
+---
+
+## Internal Errors
+
+### E_INTERNAL
+
+**Message**: `Internal state inconsistency` / various internal error messages
+
+**Cause**: An unexpected internal state was encountered during processing.
+
+**Resolution**:
+- Run `starweft repair reconcile-running-tasks` to fix inconsistent task states
+- Run `starweft repair rebuild-projections` to rebuild projection tables from the event log
+- If the issue persists, check `starweft logs` for additional context

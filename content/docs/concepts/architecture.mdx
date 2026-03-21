@@ -93,6 +93,27 @@ mdns = true
 mDNS is effective for discovering nodes within the same LAN. For communication across different networks, manually configure seed peers in `discovery.seeds`.
 </Callout>
 
+## NAT Traversal
+
+When using the libp2p transport, Starweft supports automatic NAT traversal to enable communication between nodes behind NAT.
+
+| Mechanism | Description |
+|-----------|-------------|
+| **AutoNAT** | Automatically detects whether the node is behind NAT by probing reachability from peers |
+| **UPnP** | Attempts to automatically open ports on the NAT gateway via UPnP |
+| **Circuit Relay v2** | Routes traffic through a relay node when direct connection is not possible |
+| **DCUtR** | Direct Connection Upgrade through Relay — establishes a direct connection via hole-punching after initial relay connection |
+
+```toml
+[p2p]
+transport = "libp2p"
+nat_traversal = true  # Enable NAT traversal (default: true)
+```
+
+<Callout type="info">
+NAT traversal is enabled by default when using the libp2p transport. Set `nat_traversal = false` to disable it.
+</Callout>
+
 ## Event Sourcing and SQLite WAL
 
 Starweft employs an **event sourcing pattern**. All protocol messages are recorded as immutable events in the `task_events` table, while projection tables (`projects`, `tasks`, `task_results`, etc.) provide the current state view.
@@ -126,6 +147,7 @@ Key table structure:
 | `visions` | Submitted visions |
 | `projects` | Project state (planning / active / stopping / stopped) |
 | `tasks` | Task state (queued → running → completed/failed/stopped) |
+| `task_dependencies` | Task dependency graph (depends_on relationships) |
 | `task_events` | Immutable log of all messages |
 | `task_results` | Summary of task execution results |
 | `inbox_messages` | Receive queue (with deduplication) |

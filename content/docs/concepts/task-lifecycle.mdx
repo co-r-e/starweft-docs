@@ -69,6 +69,23 @@ Each task is configured with the following:
 - **expected_output_schema**: JSON Schema describing the expected output
 </Steps>
 
+### Task Dependencies
+
+Tasks can declare explicit dependencies on other tasks using the `depends_on` field. The Owner respects these dependencies when scheduling task delegation.
+
+```
+Task A ──────────────────▶ Task C
+Task B ──────────────────▶ Task C
+```
+
+- Tasks in `depends_on` must complete before the dependent task is offered to a Worker
+- **Cycle detection**: The Owner validates the dependency graph at planning time and rejects cycles
+- Dependencies are stored in the `task_dependencies` table and visible via `task tree`
+
+<Callout type="info">
+The heuristic planner infers phase ordering from bullet point structure in the vision text. The OpenClaw planner can generate explicit `depends_on` relationships for more precise scheduling.
+</Callout>
+
 ## JoinOffer / Accept Flow
 
 Before the Owner delegates a task to a Worker, it verifies capabilities and establishes participation agreement.
@@ -110,6 +127,7 @@ After receiving a JoinAccept, the Owner delegates the specific task to the Worke
 ```json
 {
   "parent_task_id": null,
+  "depends_on": [],
   "title": "Build search index",
   "description": "Design and build the Elasticsearch index",
   "objective": "Design an index to enable full-text search",

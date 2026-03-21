@@ -2,78 +2,78 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://co-r-e.github.io/starweft-docs</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/getting-started/introduction</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/getting-started/installation</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/getting-started/quick-start</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/concepts/architecture</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/concepts/roles</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/concepts/messages</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/concepts/task-lifecycle</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/guides/first-vision</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/guides/multi-machine</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/guides/openclaw</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/guides/config</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/reference/cli-commands</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/reference/config-file</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/reference/error-codes</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/reference/env-vars</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/security/signing</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/security/key-management</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
   <url>
     <loc>https://co-r-e.github.io/starweft-docs/docs/security/audit</loc>
-    <lastmod>2026-03-19</lastmod>
+    <lastmod>2026-03-20</lastmod>
   </url>
 </urlset>

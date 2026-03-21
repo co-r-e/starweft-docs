@@ -195,6 +195,73 @@ mdns = false
 
 mDNS is **disabled** by default even when using the libp2p transport. It only operates when explicitly set to `true`.
 
+## NAT Traversal
+
+Starweft supports automatic NAT traversal when using the libp2p transport. This enables nodes behind NAT to communicate without manual port forwarding.
+
+### How It Works
+
+Starweft uses a layered approach to NAT traversal:
+
+<Steps>
+
+<div>
+
+**AutoNAT Detection**
+
+The node probes its reachability from peers to determine if it is behind NAT. If unreachable, NAT traversal mechanisms are activated automatically.
+
+</div>
+
+<div>
+
+**UPnP Port Mapping**
+
+If the NAT gateway supports UPnP, Starweft automatically requests a port mapping to make the node directly reachable.
+
+</div>
+
+<div>
+
+**Circuit Relay v2**
+
+When direct connection is not possible, traffic is routed through a relay node. This requires a relay node to be available and `relay_enabled = true` in the configuration.
+
+</div>
+
+<div>
+
+**DCUtR Hole-Punching**
+
+After initial relay connection, Starweft attempts Direct Connection Upgrade through Relay (DCUtR) to establish a direct peer-to-peer connection via hole-punching, removing the relay from the data path.
+
+</div>
+
+</Steps>
+
+### Configuration
+
+NAT traversal is enabled by default when using the libp2p transport.
+
+```toml
+[p2p]
+transport = "libp2p"
+nat_traversal = true     # Enabled by default
+relay_enabled = true     # Allow relay connections
+direct_preferred = true  # Prefer direct connections over relay
+```
+
+To disable NAT traversal:
+
+```toml
+[p2p]
+nat_traversal = false
+```
+
+<Callout type="tip">
+For nodes on public IP addresses with no NAT, NAT traversal has no effect. It only activates when AutoNAT detects that the node is unreachable.
+</Callout>
+
 ## Relay Node Configuration
 
 When nodes behind NAT cannot communicate directly with each other, messages can be relayed through a relay node.
@@ -231,6 +298,23 @@ direct_preferred = true
 
 - **`relay_enabled`** — Allow communication via relay (default: `true`)
 - **`direct_preferred`** — Prefer direct connections; use relay only when direct connection fails (default: `true`)
+
+### Relay Server Settings
+
+Relay nodes can be fine-tuned with the `[relay]` configuration section.
+
+```toml
+[relay]
+max_reservations = 128          # Maximum concurrent relay reservations
+max_circuits_per_peer = 4       # Maximum circuits per peer
+reservation_duration_sec = 3600 # Reservation lifetime (seconds)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_reservations` | u32 | `128` | Maximum number of concurrent relay reservations |
+| `max_circuits_per_peer` | u32 | `4` | Maximum number of circuits a single peer can hold |
+| `reservation_duration_sec` | u64 | `3600` | Duration of a relay reservation in seconds |
 
 ## Seed Peer Configuration
 
