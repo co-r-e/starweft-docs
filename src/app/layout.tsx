@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: `${SITE_NAME} | Distributed Multi-Agent Task Coordination CLI`,
   description: SITE_DESCRIPTION,
+  verification: {
+    google: "CBcDA0b8srBcFKeEHkeDyhDckldYfdR1QRjYWExLy7I",
+  },
   openGraph: {
     siteName: SITE_NAME,
     locale: "en_US",
